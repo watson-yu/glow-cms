@@ -1,0 +1,189 @@
+"use client";
+import { useEffect, useState } from "react";
+import { substituteVars } from "@/lib/template";
+import PromptEditor from "./PromptEditor";
+
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType }) {
+  const [items, setItems] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [form, setForm] = useState({ name: "", [contentField]: "" });
+  const [prompt, setPrompt] = useState("");
+  const [llmProvider, setLlmProvider] = useState("gemini");
+  const [generating, setGenerating] = useState(false);
+  const [config, setConfig] = useState({});
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/site-config").then(r => r.json()).then(setConfig);
+    loadItems();
+  }, []);
+
+  async function loadItems() {
+    const data = await (await fetch(apiPath)).json();
+    setItems(data);
+    if (data.length && !selectedId) selectItem(data[0]);
+  }
+
+  function selectItem(item) {
+    setSelectedId(item.id);
+    setForm({ name: item.name, [contentField]: item[contentField] || "" });
+    setPrompt("");
+    setSaved(false);
+  }
+
+  function handleSelect(e) {
+    const item = items.find(i => i.id === Number(e.target.value));
+    if (item) selectItem(item);
+  }
+
+  function addNew() {
+    setSelectedId("new");
+    setForm({ name: "", [contentField]: "" });
+    setPrompt("");
+    setSaved(false);
+  }
+
+  async function saveName() {
+    if (selectedId === "new" || !selectedId) return;
+    await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setItems(items.map(i => i.id === selectedId ? { ...i, name: form.name } : i));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function save() {
+    const url = selectedId === "new" ? apiPath : `${apiPath}/${selectedId}`;
+    const method = selectedId === "new" ? "POST" : "PUT";
+    const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    if (selectedId === "new") {
+      const { id } = await res.json();
+      const data = await (await fetch(apiPath)).json();
+      setItems(data);
+      const created = data.find(i => i.id === id);
+      if (created) selectItem(created);
+    } else {
+      setItems(items.map(i => i.id === selectedId ? { ...i, ...form } : i));
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  async function remove() {
+    if (!confirm("Delete this item?")) return;
+    await fetch(`${apiPath}/${selectedId}`, { method: "DELETE" });
+    const data = await (await fetch(apiPath)).json();
+    setItems(data);
+    if (data.length) selectItem(data[0]);
+    else { setSelectedId(null); setForm({ name: "", [contentField]: "" }); }
+  }
+
+  async function generate() {
+    if (!prompt.trim()) return;
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider: llmProvider,
+          prompt,
+          currentHtml: form[contentField],
+          objectType: objectType || null,
+          objectKey: selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null,
+        }),
+      });
+      const data = await res.json();
+      console.log("[Generate response]", data);
+      if (data.error) { alert(data.error); }
+      else { setForm(f => ({ ...f, [contentField]: data.html })); }
+    } catch (e) { alert("Generation failed: " + e.message); }
+    setGenerating(false);
+  }
+
+  const objectKey = selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null;
+
+  return (
+    <>
+      {/* Row 1: title + dropdown + Add New */}
+      <div className="page-header">
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <h1>{title}</h1>
+          <select value={selectedId === "new" ? "__new__" : selectedId || ""} onChange={handleSelect} className="form-input" style={{ width: 200 }}>
+            {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        </div>
+        <button type="button" onClick={addNew} className="btn btn-primary btn-sm">+ Add New</button>
+      </div>
+
+      {/* Row 2: Name edit + Save name + Delete */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20 }}>
+        <label style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Name:</label>
+        <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="form-input" placeholder="Name" style={{ maxWidth: 260 }} required />
+        <button type="button" onClick={saveName} className="btn btn-secondary btn-sm">Save</button>
+        {selectedId && selectedId !== "new" && items.length > 1 && (
+          <button type="button" onClick={remove} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Delete</button>
+        )}
+        {saved && <span className="toast-saved">✓ Saved</span>}
+      </div>
+
+      {/* Preview */}
+      <div className="card">
+        <div className="card-title">Preview</div>
+        <div className="template-preview">
+          {renderPreview
+            ? renderPreview(substituteVars(form[contentField], config))
+            : <div dangerouslySetInnerHTML={{ __html: substituteVars(form[contentField], config) || '<span style="color:var(--text-muted)">No content yet</span>' }} />
+          }
+        </div>
+      </div>
+
+      {/* Editor grid */}
+      <div className="template-editor-grid">
+        <div className="card">
+          <div className="card-title">Template Source</div>
+          <div className="config-ref">
+            <strong>Variables:</strong>{" "}
+            {Object.keys(config).map(k => <code key={k} className="var-tag">{`{{${k}}}`}</code>)}
+          </div>
+          <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
+          <div style={{ marginTop: 12 }}>
+            <button type="button" onClick={save} className="btn btn-primary">Save</button>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-title">AI Generate</div>
+          <div className="llm-radios">
+            {[["openai", "OpenAI"], ["claude", "Anthropic"], ["gemini", "Gemini"]].map(([val, label]) => (
+              <label key={val} className="llm-radio">
+                <input type="radio" name="llm" value={val} checked={llmProvider === val} onChange={() => setLlmProvider(val)} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={12} className="form-input" placeholder="Describe what you want to generate…" />
+          <div style={{ marginTop: 12 }}>
+            <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || !prompt.trim()}>
+              {generating ? "Generating…" : "Generate"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Prompt editors */}
+      {objectType && (
+        <div className="template-editor-grid" style={{ marginTop: 20 }}>
+          <div className="card">
+            <PromptEditor scopeType="object_type" scopeKey={objectType} label={`${title} Type Prompt`} />
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies to all {title.toLowerCase()} when generating.</p>
+          </div>
+          {objectKey && (
+            <div className="card">
+              <PromptEditor key={objectKey} scopeType="object" scopeKey={objectKey} label={`"${form.name || "This Item"}" Prompt`} />
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies only to this specific item.</p>
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
