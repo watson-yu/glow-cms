@@ -1,6 +1,6 @@
 # Glow CMS
 
-An AI-powered content management system built with Next.js 16 and MySQL. Glow CMS lets you manage pages, headers, footers, and page templates — with built-in LLM integration (OpenAI, Anthropic, Gemini) to generate HTML templates from natural language prompts.
+An AI-powered content management system built with Next.js 16 and MySQL. Glow CMS lets you manage pages, headers, footers, and page templates, with Google sign-in for admin access and built-in LLM integration (OpenAI, Anthropic, Gemini) to generate HTML templates from natural language prompts.
 
 ## Features
 
@@ -8,6 +8,8 @@ An AI-powered content management system built with Next.js 16 and MySQL. Glow CM
 - **Template system** — headers, footers, and page templates with `{{variable}}` substitution from site config
 - **AI content generation** — generate HTML templates using OpenAI, Anthropic, or Gemini directly from the admin UI
 - **3-level prompt management** — system, object-type, and object-level prompts with version history
+- **Google admin sign-in** — optional NextAuth login with user allowlisting and login tracking
+- **Generation logs** — review the last 100 AI generations with prompt/version metadata
 - **Section types** — reusable content blocks with default templates
 - **S3 image uploads** — logo and media uploads to AWS S3
 - **Live preview** — preview pages at `/preview/{slug}` (works for drafts too)
@@ -52,88 +54,13 @@ DB_PORT=3306
 
 ### 3. Set up the database
 
-Run the SQL schema to create all tables:
+Run the checked-in bootstrap schema:
 
-```sql
-CREATE DATABASE glow_cms;
-USE glow_cms;
-
-CREATE TABLE site_config (
-  config_key VARCHAR(100) PRIMARY KEY,
-  config_value TEXT
-);
-
-CREATE TABLE system_config (
-  config_key VARCHAR(100) PRIMARY KEY,
-  config_value TEXT
-);
-
-CREATE TABLE headers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  content TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE footers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  content TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE page_templates (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  content TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE section_types (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  default_content TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE pages (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  title VARCHAR(255) NOT NULL,
-  slug VARCHAR(255) NOT NULL UNIQUE,
-  status ENUM('draft','published') DEFAULT 'draft',
-  header_id INT,
-  footer_id INT,
-  page_template_id INT DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
-CREATE TABLE sections (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  page_id INT NOT NULL,
-  section_type_id INT NOT NULL,
-  content TEXT,
-  sort_order INT DEFAULT 0,
-  FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
-  FOREIGN KEY (section_type_id) REFERENCES section_types(id)
-);
-
-CREATE TABLE prompts (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  scope_type ENUM('system','object_type','object') NOT NULL,
-  scope_key VARCHAR(100) NOT NULL,
-  version INT NOT NULL DEFAULT 1,
-  content TEXT,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_scope (scope_key, is_active)
-);
-
--- Seed data
-INSERT INTO page_templates (name, content) VALUES ('Default', '<div class="page-content">{{content}}</div>');
-INSERT INTO prompts (scope_type, scope_key, version, content, is_active) VALUES
-  ('system', 'system', 1, 'You are an HTML template generator for a CMS. Generate clean, semantic HTML. Use {{variable}} placeholders for dynamic values from site config. Return ONLY HTML, no markdown fences, no explanation.', 1);
+```bash
+mysql -u root -p < db/schema.sql
 ```
+
+`db/schema.sql` creates the `glow_cms` database and all 11 application tables, including `users` and `generation_logs`, which are required by the admin UI.
 
 ### 4. Run
 
@@ -147,7 +74,7 @@ npm run dev
 
 ### 5. Configure in the admin
 
-1. **System Config** — set AWS S3 credentials, LLM API keys
+1. **System Config** — set AWS S3 credentials, LLM API keys, and optional Google OAuth keys
 2. **Site Config** — set site title, logo, content path prefix, copyright, etc.
 3. **Headers/Footers** — create templates using `{{variable}}` placeholders
 4. **Page Templates** — define page layouts (preview shows header + template + footer)
@@ -157,6 +84,8 @@ npm run dev
 
 ```
 glow-cms/
+├── db/
+│   └── schema.sql              # Bootstrap database schema
 ├── app/
 │   ├── cms-admin/              # Admin UI
 │   │   ├── AdminShell.js       # Sidebar + header layout
@@ -171,14 +100,20 @@ glow-cms/
 │   │   ├── pages/              # Page CRUD + edit form
 │   │   ├── section-types/      # Section type management
 │   │   ├── prompts/            # Prompt review + version history
+│   │   ├── users/              # Admin users list
+│   │   ├── generation-logs/    # AI generation audit log
 │   │   ├── site-config/        # Site-level settings
 │   │   └── system-config/      # System settings + LLM keys + system prompt
 │   ├── api/                    # REST API routes
+│   │   ├── auth/               # NextAuth Google sign-in
+│   │   ├── db-setup/           # Validate/store DB connection config
 │   │   ├── pages/              # CRUD
 │   │   ├── headers/            # CRUD
 │   │   ├── footers/            # CRUD
 │   │   ├── page-templates/     # CRUD
 │   │   ├── section-types/      # CRUD
+│   │   ├── users/              # Admin user list
+│   │   ├── generation-logs/    # Recent AI generations
 │   │   ├── site-config/        # GET/PUT
 │   │   ├── system-config/      # GET/PUT (secrets masked)
 │   │   ├── prompts/            # GET/POST/PUT + /all
@@ -218,6 +153,16 @@ The template editor includes an AI generation panel. When you click "Generate":
 3. The object-specific prompt (e.g. "header:1") is appended if set
 4. Your ad-hoc prompt + current HTML are sent as the user message
 5. The LLM returns HTML that replaces the template source
+
+Each successful generation is also written to `generation_logs`, which powers the `/cms-admin/generation-logs` audit view.
+
+## Auth And Admin Users
+
+If `google_client_id` and `google_client_secret` are present in `system_config`, the admin UI requires Google sign-in through NextAuth.
+
+- Allowed logins are controlled by the `allowed_logins` system config key
+- Successful sign-ins upsert a row in `users`
+- The Users admin page reads directly from the `users` table
 
 Supported providers: OpenAI (gpt-4o-mini), Anthropic (claude-sonnet-4-20250514), Gemini (gemini-2.5-flash).
 

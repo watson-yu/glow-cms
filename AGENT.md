@@ -9,14 +9,14 @@ Glow CMS is a Next.js 16 App Router application with a MySQL backend. There is n
 ### Key Architectural Decisions
 
 - **No ORM**: All queries are raw SQL in API route handlers and `lib/pages.js`
-- **No auth yet**: Admin routes are unprotected (auth is planned)
+- **Optional auth**: Admin routes require Google sign-in when OAuth keys are configured in `system_config`
 - **No component library**: All UI is plain HTML/CSS with a custom design system in `globals.css`
 - **Template engine**: Simple `{{variable}}` regex replacement, not a full template language
 - **Config in DB**: Both site config and system config are stored in MySQL, not env vars (except DB connection)
 
 ## Database Schema
 
-9 tables in `glow_cms`:
+11 tables in `glow_cms`:
 
 | Table | Purpose |
 |---|---|
@@ -29,6 +29,8 @@ Glow CMS is a Next.js 16 App Router application with a MySQL backend. There is n
 | `site_config` | Key-value pairs for public site settings (title, logo, paths, etc.) |
 | `system_config` | Key-value pairs for system settings (AWS keys, DB config, LLM API keys) |
 | `prompts` | Versioned prompts with scope_type/scope_key/version/is_active |
+| `users` | Admin users created via Google sign-in, with role and last login tracking |
+| `generation_logs` | Stored AI generation requests/responses with prompt version references |
 
 ### Relationships
 
@@ -88,6 +90,8 @@ Each scope_key can have multiple versions. Only one is `is_active = 1` at a time
 | `/cms-admin/pages/[id]` | Page view |
 | `/cms-admin/pages/[id]/edit` | Page edit form |
 | `/cms-admin/prompts` | Prompt review + version history |
+| `/cms-admin/users` | Admin user directory |
+| `/cms-admin/generation-logs` | AI generation audit log |
 | `/cms-admin/site-config` | Site settings |
 | `/cms-admin/system-config` | System settings + LLM keys + system prompt |
 | `/preview/[slug]` | Preview any page (draft or published) |
@@ -115,6 +119,10 @@ DELETE /api/{resource}/[id]   → delete
 ```
 
 Special routes:
+- `GET/POST /api/auth/[...nextauth]` — NextAuth Google sign-in
+- `GET/POST /api/db-setup` — DB connection validation + local config persistence
+- `GET /api/users` — list admin users from `users`
+- `GET /api/generation-logs` — list the latest 100 AI generations
 - `GET/PUT /api/site-config` — bulk key-value get/set
 - `GET/PUT /api/system-config` — bulk key-value get/set (secrets masked on GET)
 - `GET /api/prompts?scope_key=xxx` — get active prompt + version history
@@ -127,6 +135,10 @@ Special routes:
 ### Secret Masking
 
 `system_config` API masks secret keys on GET (shows `••••••••` + last 4 chars). The masked keys are defined in `SECRET_KEYS` array in the route handler. On PUT, empty values for secret keys are skipped (preserves existing value).
+
+### Auth Flow
+
+If `google_client_id` and `google_client_secret` are set in `system_config`, the admin shell requires a NextAuth Google session. Successful sign-ins are allowlist-checked against `allowed_logins` and then upserted into `users` with `last_login = NOW()`.
 
 ## Admin UI Components
 
