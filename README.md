@@ -74,7 +74,7 @@ npm run dev
 
 ### 5. Configure in the admin
 
-1. **System Config** — set AWS S3 credentials, LLM API keys, and optional Google OAuth keys
+1. **System Config** — set AWS S3 credentials, LLM API keys, and optional Google auth settings (`google_client_id`, `google_client_secret`, `nextauth_secret`)
 2. **Site Config** — set site title, logo, content path prefix, copyright, etc.
 3. **Headers/Footers** — create templates using `{{variable}}` placeholders
 4. **Page Templates** — define page layouts (preview shows header + template + footer)
@@ -158,7 +158,7 @@ Each successful generation is also written to `generation_logs`, which powers th
 
 ## Auth And Admin Users
 
-If `google_client_id` and `google_client_secret` are present in `system_config`, the admin UI requires Google sign-in through NextAuth.
+If `google_client_id`, `google_client_secret`, and `nextauth_secret` are present in `system_config`, the admin UI requires Google sign-in through NextAuth.
 
 - Allowed logins are controlled by the `allowed_logins` system config key
 - Successful sign-ins upsert a row in `users`

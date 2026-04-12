@@ -1,9 +1,17 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import pool from "@/lib/db";
+import { isDbConfigured } from "@/lib/db";
+import { NextResponse } from "next/server";
+
+let pool;
+async function getPool() {
+  if (!pool) pool = (await import("@/lib/db")).getPool();
+  return pool;
+}
 
 async function getConfig(key) {
-  const [rows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
+  const p = await getPool();
+  const [rows] = await p.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
   return rows[0]?.config_value || "";
 }
 
@@ -23,16 +31,19 @@ async function getAuthOptions() {
     getConfig("google_client_secret"),
     getConfig("nextauth_secret"),
   ]);
+  if (!clientId || !clientSecret || !secret) {
+    throw new Error("Google auth is not fully configured");
+  }
   return {
     providers: [
       GoogleProvider({ clientId, clientSecret }),
     ],
-    secret: secret || process.env.NEXTAUTH_SECRET || "glow-cms-default-secret",
+    secret,
     callbacks: {
       async signIn({ user }) {
         const allowed = await getConfig("allowed_logins");
         if (!isEmailAllowed(user.email || "", allowed)) return false;
-        await pool.query(
+        await (await getPool()).query(
           `INSERT INTO users (email, name, image, last_login) VALUES (?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE name=VALUES(name), image=VALUES(image), last_login=NOW()`,
           [user.email, user.name, user.image]
@@ -47,7 +58,13 @@ async function getAuthOptions() {
 }
 
 async function handler(req, ctx) {
-  const authOptions = await getAuthOptions();
+  if (!isDbConfigured()) return NextResponse.json({});
+  let authOptions;
+  try {
+    authOptions = await getAuthOptions();
+  } catch (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   // Auto-detect NEXTAUTH_URL from request
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
   const proto = req.headers.get("x-forwarded-proto") || "https";

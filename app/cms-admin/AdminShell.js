@@ -31,7 +31,7 @@ const TZ_OPTIONS = [
   { label: "Taipei", value: "Asia/Taipei" },
 ];
 
-function ProfileDropdown() {
+function ProfileDropdown({ authConfigured }) {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
   const [tz, setTz] = useState(() => (typeof localStorage !== "undefined" && localStorage.getItem("glow-tz")) || "Asia/Taipei");
@@ -47,14 +47,25 @@ function ProfileDropdown() {
       <button onClick={() => setOpen(!open)} className="profile-btn" title={session?.user?.email || "Account"}>
         {session?.user?.image
           ? <img src={session.user.image} alt="" style={{ width: 28, height: 28, borderRadius: "50%" }} />
-          : <span style={{ width: 28, height: 28, borderRadius: "50%", background: "var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>👤</span>
+          : <span style={{ width: 28, height: 28, borderRadius: "50%", background: authConfigured ? "var(--border)" : "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{authConfigured ? "👤" : "⚠️"}</span>
         }
       </button>
       {open && (
         <>
           <div className="profile-overlay" onClick={() => setOpen(false)} />
           <div className="profile-dropdown">
-            {session ? (
+            {!authConfigured ? (
+              <>
+                <div className="profile-dropdown-item" style={{ cursor: "default", fontSize: 12, color: "#b45309", fontWeight: 500 }}>Auth not configured</div>
+                <div className="profile-dropdown-item" style={{ cursor: "default", fontSize: 12, color: "var(--text-muted)", lineHeight: 1.5 }}>
+                  Set up Google OAuth in<br />System Config to enable login.
+                </div>
+                <div className="profile-dropdown-divider" />
+                <Link href="/cms-admin/system-config" className="profile-dropdown-item" onClick={() => setOpen(false)} style={{ color: "var(--primary)", fontWeight: 500, textDecoration: "none", display: "block" }}>
+                  Go to System Config →
+                </Link>
+              </>
+            ) : session ? (
               <>
                 <div className="profile-dropdown-item" style={{ fontWeight: 500, color: "var(--text)", cursor: "default" }}>{session.user.email}</div>
                 <div className="profile-dropdown-divider" />
@@ -106,7 +117,7 @@ export default function AdminShell({ children }) {
       if (d.configured) {
         fetch("/api/site-config").then(r => r.json()).then(c => setSite(c));
         fetch("/api/system-config").then(r => r.json()).then(c => {
-          setAuthRequired(!!(c.google_client_id && c.google_client_secret));
+          setAuthRequired(!!(c.google_client_id && c.google_client_secret?.hasValue && c.nextauth_secret?.hasValue));
         });
       }
     });
@@ -123,7 +134,7 @@ export default function AdminShell({ children }) {
           {site.logo_url ? <img src={site.logo_url} alt="" style={{ height: 28, borderRadius: 4 }} /> : <span>✦</span>}
           {site.site_title || "Glow CMS"}
         </Link>
-        <ProfileDropdown />
+        <ProfileDropdown authConfigured={authRequired} />
       </header>
       <nav className="admin-sidebar">
         {sections.map(s => (

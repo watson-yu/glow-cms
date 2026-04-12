@@ -1,7 +1,7 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 
-const SECRET_KEYS = ["aws_access_key", "aws_secret_key", "db_password", "google_client_secret", "openai_api_key", "claude_api_key", "gemini_api_key"];
+const SECRET_KEYS = ["aws_access_key", "aws_secret_key", "db_password", "google_client_secret", "nextauth_secret", "openai_api_key", "claude_api_key", "gemini_api_key"];
 
 function mask(value) {
   if (!value || value.length <= 4) return "••••";

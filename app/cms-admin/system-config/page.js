@@ -20,6 +20,7 @@ const sections = [
   { title: "Google OAuth", desc: "Google sign-in credentials.", fields: [
     { key: "google_client_id", label: "Client ID" },
     { key: "google_client_secret", label: "Client Secret", secret: true },
+    { key: "nextauth_secret", label: "NextAuth Secret", secret: true },
   ]},
   { title: "Login Restrictions", desc: "Allowed emails and domains (one per line). e.g. watson@google.com or @glow360.com. Leave empty to allow all.", fields: [
     { key: "allowed_logins", label: "Allowed Logins", multiline: true },

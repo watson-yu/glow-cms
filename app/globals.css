@@ -272,7 +272,7 @@ select.form-input { cursor: pointer; }
 .db-setup-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 40px;
-  width: 100%; max-width: 420px;
+  width: 100%; max-width: 600px;
   box-shadow: var(--shadow-md);
 }
 .db-setup-logo {
