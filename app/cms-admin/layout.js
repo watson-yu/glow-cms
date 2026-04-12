@@ -16,6 +16,8 @@ export async function generateMetadata() {
   }
 }
 
+import AuthProvider from "./components/AuthProvider";
+
 export default function CmsAdminLayout({ children }) {
-  return <AdminShell>{children}</AdminShell>;
+  return <AuthProvider><AdminShell>{children}</AdminShell></AuthProvider>;
 }

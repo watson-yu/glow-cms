@@ -1,9 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { fmtDate, useTzRefresh } from "@/lib/fmt";
 
 export default function GenerationLogsPage() {
   const [logs, setLogs] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  useTzRefresh();
 
   useEffect(() => { fetch("/api/generation-logs").then(r => r.json()).then(setLogs); }, []);
 
@@ -19,7 +21,7 @@ export default function GenerationLogsPage() {
             {logs.map(log => (
               <React.Fragment key={log.id}>
                 <tr onClick={() => setExpanded(expanded === log.id ? null : log.id)} style={{ cursor: "pointer" }}>
-                  <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>{new Date(log.created_at).toLocaleString("sv-SE", { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).replace(",", "")}</td>
+                  <td style={{ fontSize: 12, whiteSpace: "nowrap" }}>{fmtDate(log.created_at)}</td>
                   <td>{log.provider}</td>
                   <td style={{ fontSize: 12, fontFamily: "monospace" }}>{log.model}</td>
                   <td style={{ fontFamily: "monospace", fontSize: 12 }}>{log.object_key || log.object_type || "—"}</td>

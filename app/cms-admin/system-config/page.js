@@ -21,6 +21,9 @@ const sections = [
     { key: "google_client_id", label: "Client ID" },
     { key: "google_client_secret", label: "Client Secret", secret: true },
   ]},
+  { title: "Login Restrictions", desc: "Allowed emails and domains (one per line). e.g. watson@google.com or @glow360.com. Leave empty to allow all.", fields: [
+    { key: "allowed_logins", label: "Allowed Logins", multiline: true },
+  ]},
   { title: "LLM API Keys", desc: "API keys for AI language models.", fields: [
     { key: "openai_api_key", label: "OpenAI", secret: true },
     { key: "claude_api_key", label: "Claude (Anthropic)", secret: true },
@@ -124,6 +127,15 @@ export default function SystemConfigPage() {
                       {editing[f.key] ? "Cancel" : "Change"}
                     </button>
                   </div>
+                ) : f.multiline ? (
+                  <textarea
+                    value={edits[f.key] ?? (typeof config[f.key] === "string" ? config[f.key] : "") ?? ""}
+                    onChange={e => setEdits({ ...edits, [f.key]: e.target.value })}
+                    className="form-input"
+                    rows={4}
+                    placeholder="one entry per line"
+                    style={{ fontFamily: "monospace", fontSize: 13 }}
+                  />
                 ) : (
                   <input
                     value={edits[f.key] ?? (typeof config[f.key] === "string" ? config[f.key] : "") ?? ""}

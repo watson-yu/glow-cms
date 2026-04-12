@@ -284,3 +284,24 @@ select.form-input { cursor: pointer; }
   padding: 10px 14px; border-radius: var(--radius-sm);
   font-size: 13px; margin-bottom: 12px; word-break: break-word;
 }
+
+/* Profile dropdown */
+.profile-btn {
+  background: none; border: none; cursor: pointer; padding: 4px;
+  display: flex; align-items: center;
+}
+.profile-overlay {
+  position: fixed; inset: 0; z-index: 99;
+}
+.profile-dropdown {
+  position: absolute; right: 0; top: 36px; z-index: 100;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12); min-width: 200px;
+  padding: 4px 0;
+}
+.profile-dropdown-item {
+  padding: 8px 16px; font-size: 13px; cursor: pointer;
+  color: var(--text-secondary);
+}
+.profile-dropdown-item:hover { background: var(--bg); }
+.profile-dropdown-divider { height: 1px; background: var(--border); margin: 4px 0; }
