@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import DbSetup from "./components/DbSetup";
 
 const P = "/cms-admin";
 
@@ -25,10 +26,19 @@ const sections = [
 export default function AdminShell({ children }) {
   const path = usePathname();
   const [site, setSite] = useState({ site_title: "", logo_url: "" });
+  const [dbReady, setDbReady] = useState(null); // null = loading
 
   useEffect(() => {
-    fetch("/api/site-config").then(r => r.json()).then(c => setSite(c));
+    fetch("/api/db-setup").then(r => r.json()).then(d => {
+      setDbReady(d.configured);
+      if (d.configured) {
+        fetch("/api/site-config").then(r => r.json()).then(c => setSite(c));
+      }
+    });
   }, []);
+
+  if (dbReady === null) return null; // loading
+  if (!dbReady) return <DbSetup />;
 
   return (
     <>

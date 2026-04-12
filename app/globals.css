@@ -262,3 +262,25 @@ select.form-input { cursor: pointer; }
 .prompt-version-active { border-color: var(--primary); background: #f0f4ff; }
 .prompt-version-header { display: flex; gap: 12px; align-items: center; margin-bottom: 6px; }
 .prompt-version-content { font-size: 12px; font-family: monospace; white-space: pre-wrap; color: var(--text-secondary); margin: 0; max-height: 120px; overflow-y: auto; }
+
+/* DB Setup */
+.db-setup-overlay {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg);
+}
+.db-setup-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 40px;
+  width: 100%; max-width: 420px;
+  box-shadow: var(--shadow-md);
+}
+.db-setup-logo {
+  font-size: 20px; font-weight: 700; color: var(--primary); margin-bottom: 24px;
+}
+.db-setup-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.db-setup-error {
+  background: #fef2f2; border: 1px solid #fecaca; color: #991b1b;
+  padding: 10px 14px; border-radius: var(--radius-sm);
+  font-size: 13px; margin-bottom: 12px; word-break: break-word;
+}
