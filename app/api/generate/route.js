@@ -6,49 +6,45 @@ async function getKey(key) {
   return rows[0]?.config_value || "";
 }
 
-async function getActivePrompt(scopeKey) {
-  const [rows] = await pool.query("SELECT content FROM prompts WHERE scope_key = ? AND is_active = 1", [scopeKey]);
-  return rows[0]?.content || "";
-}
-
-async function buildSystemPrompt(objectType, objectKey) {
-  const parts = [await getActivePrompt("system")];
-  if (objectType) parts.push(await getActivePrompt(objectType));
-  if (objectKey) parts.push(await getActivePrompt(objectKey));
-  return parts.filter(Boolean).join("\n\n");
+async function getActivePromptRow(scopeKey) {
+  const [rows] = await pool.query("SELECT id, version, content FROM prompts WHERE scope_key = ? AND is_active = 1", [scopeKey]);
+  return rows[0] || null;
 }
 
 async function callOpenAI(apiKey, systemPrompt, userPrompt) {
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey });
+  const model = "gpt-4o-mini";
   const res = await client.chat.completions.create({
-    model: "gpt-4o-mini",
+    model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
     ],
   });
-  return res.choices[0].message.content;
+  return { html: res.choices[0].message.content, model };
 }
 
 async function callClaude(apiKey, systemPrompt, userPrompt) {
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const client = new Anthropic({ apiKey });
+  const model = "claude-sonnet-4-20250514";
   const res = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model,
     max_tokens: 4096,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
   });
-  return res.content[0].text;
+  return { html: res.content[0].text, model };
 }
 
 async function callGemini(apiKey, systemPrompt, userPrompt) {
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const client = new GoogleGenerativeAI(apiKey);
-  const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
-  const res = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`);
-  return res.response.text();
+  const model = "gemini-2.5-flash";
+  const genModel = client.getGenerativeModel({ model });
+  const res = await genModel.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+  return { html: res.response.text(), model };
 }
 
 export async function POST(req) {
@@ -59,16 +55,37 @@ export async function POST(req) {
   const apiKey = await getKey(keyMap[provider] || keyMap.gemini);
   if (!apiKey) return NextResponse.json({ error: `No API key configured for ${provider}` }, { status: 400 });
 
-  const systemPrompt = await buildSystemPrompt(objectType, objectKey);
-  const userPrompt = `Current template:\n${currentHtml || "(empty)"}\n\nRequest: ${prompt}`;
+  // Fetch prompt rows for logging
+  const sysRow = await getActivePromptRow("system");
+  const typeRow = objectType ? await getActivePromptRow(objectType) : null;
+  const objRow = objectKey ? await getActivePromptRow(objectKey) : null;
 
-  console.log("[Generate] provider:", provider, "system prompt length:", systemPrompt.length);
+  const parts = [sysRow?.content, typeRow?.content, objRow?.content].filter(Boolean);
+  const systemPrompt = parts.join("\n\n");
+  const userPrompt = `Current template:\n${currentHtml || "(empty)"}\n\nRequest: ${prompt}`;
 
   try {
     const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
-    const html = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt);
-    console.log("[LLM Response]", provider, JSON.stringify(html).slice(0, 200));
-    return NextResponse.json({ html });
+    const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt);
+
+    // Log generation
+    await pool.query(
+      `INSERT INTO generation_logs (provider, model, object_type, object_key,
+        system_prompt_id, system_prompt_version,
+        type_prompt_id, type_prompt_version,
+        object_prompt_id, object_prompt_version,
+        user_prompt, current_html, response_html)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        provider, result.model, objectType || null, objectKey || null,
+        sysRow?.id || null, sysRow?.version || null,
+        typeRow?.id || null, typeRow?.version || null,
+        objRow?.id || null, objRow?.version || null,
+        prompt, currentHtml || null, result.html,
+      ]
+    );
+
+    return NextResponse.json({ html: result.html });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

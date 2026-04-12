@@ -42,7 +42,7 @@ export default function PromptEditor({ scopeType, scopeKey, label }) {
   return (
     <div>
       {label && <div className="card-title" style={{ marginBottom: 12 }}>{label}</div>}
-      <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={4} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} placeholder="Enter prompt..." />
+      <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} placeholder="Enter prompt..." />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
         <button type="button" onClick={saveNew} className="btn btn-primary btn-sm" disabled={!changed}>Save as v{(active?.version || 0) + 1}</button>
         {versions.length > 1 && (
