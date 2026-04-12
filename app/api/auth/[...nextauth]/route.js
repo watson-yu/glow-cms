@@ -18,15 +18,16 @@ function isEmailAllowed(email, allowedLogins) {
 }
 
 async function getAuthOptions() {
-  const [clientId, clientSecret] = await Promise.all([
+  const [clientId, clientSecret, secret] = await Promise.all([
     getConfig("google_client_id"),
     getConfig("google_client_secret"),
+    getConfig("nextauth_secret"),
   ]);
   return {
     providers: [
       GoogleProvider({ clientId, clientSecret }),
     ],
-    secret: process.env.NEXTAUTH_SECRET || "glow-cms-default-secret",
+    secret: secret || process.env.NEXTAUTH_SECRET || "glow-cms-default-secret",
     callbacks: {
       async signIn({ user }) {
         const allowed = await getConfig("allowed_logins");
@@ -47,6 +48,10 @@ async function getAuthOptions() {
 
 async function handler(req, ctx) {
   const authOptions = await getAuthOptions();
+  // Auto-detect NEXTAUTH_URL from request
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  if (host) process.env.NEXTAUTH_URL = `${proto}://${host}`;
   return NextAuth(req, ctx, authOptions);
 }
 
