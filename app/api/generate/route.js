@@ -11,44 +11,51 @@ async function getActivePromptRow(scopeKey) {
   return rows[0] || null;
 }
 
-async function callOpenAI(apiKey, systemPrompt, userPrompt) {
+async function callOpenAI(apiKey, systemPrompt, userPrompt, imageData) {
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey });
   const model = "gpt-4o-mini";
+  const content = [{ type: "text", text: userPrompt }];
+  if (imageData) content.push({ type: "image_url", image_url: { url: `data:${imageData.mimeType};base64,${imageData.base64}` } });
   const res = await client.chat.completions.create({
     model,
     messages: [
       { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
+      { role: "user", content },
     ],
   });
   return { html: res.choices[0].message.content, model };
 }
 
-async function callClaude(apiKey, systemPrompt, userPrompt) {
+async function callClaude(apiKey, systemPrompt, userPrompt, imageData) {
   const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const client = new Anthropic({ apiKey });
   const model = "claude-sonnet-4-20250514";
+  const content = [];
+  if (imageData) content.push({ type: "image", source: { type: "base64", media_type: imageData.mimeType, data: imageData.base64 } });
+  content.push({ type: "text", text: userPrompt });
   const res = await client.messages.create({
     model,
     max_tokens: 4096,
     system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
+    messages: [{ role: "user", content }],
   });
   return { html: res.content[0].text, model };
 }
 
-async function callGemini(apiKey, systemPrompt, userPrompt) {
+async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const client = new GoogleGenerativeAI(apiKey);
   const model = "gemini-2.5-flash";
   const genModel = client.getGenerativeModel({ model });
-  const res = await genModel.generateContent(`${systemPrompt}\n\n${userPrompt}`);
+  const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
+  if (imageData) parts.push({ inlineData: { mimeType: imageData.mimeType, data: imageData.base64 } });
+  const res = await genModel.generateContent(parts);
   return { html: res.response.text(), model };
 }
 
 export async function POST(req) {
-  const { provider, prompt, currentHtml, objectType, objectKey } = await req.json();
+  const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
   if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
 
   const keyMap = { openai: "openai_api_key", claude: "claude_api_key", gemini: "gemini_api_key" };
@@ -66,7 +73,7 @@ export async function POST(req) {
 
   try {
     const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
-    const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt);
+    const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
 
     // Log generation
     await pool.query(

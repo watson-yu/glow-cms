@@ -10,6 +10,7 @@ const P = "/cms-admin";
 const sections = [
   { label: "Content", items: [
     { href: `${P}`, label: "Pages" },
+    { href: `${P}/categories`, label: "Categories" },
   ]},
   { label: "Components", items: [
     { href: `${P}/headers`, label: "Headers" },

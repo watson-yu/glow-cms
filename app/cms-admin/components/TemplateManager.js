@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 
-export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType }) {
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [form, setForm] = useState({ name: "", [contentField]: "" });
+  const [form, setForm] = useState({ name: "", [contentField]: "", variables: [] });
   const [prompt, setPrompt] = useState("");
+  const [imageData, setImageData] = useState(null); // { base64, mimeType }
   const [llmProvider, setLlmProvider] = useState("gemini");
   const [generating, setGenerating] = useState(false);
   const [config, setConfig] = useState({});
@@ -26,7 +27,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   function selectItem(item) {
     setSelectedId(item.id);
-    setForm({ name: item.name, [contentField]: item[contentField] || "" });
+    const vars = typeof item.variables === "string" ? JSON.parse(item.variables || "[]") : (item.variables || []);
+    setForm({ name: item.name, [contentField]: item[contentField] || "", variables: vars });
     setPrompt("");
     setSaved(false);
   }
@@ -38,7 +40,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   function addNew() {
     setSelectedId("new");
-    setForm({ name: "", [contentField]: "" });
+    setForm({ name: "", [contentField]: "", variables: [] });
     setPrompt("");
     setSaved(false);
   }
@@ -77,6 +79,17 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     else { setSelectedId(null); setForm({ name: "", [contentField]: "" }); }
   }
 
+  function handleImage(e) {
+    const file = e.target.files[0];
+    if (!file) { setImageData(null); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      setImageData({ base64, mimeType: file.type });
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function generate() {
     if (!prompt.trim()) return;
     setGenerating(true);
@@ -86,10 +99,13 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           provider: llmProvider,
-          prompt,
+          prompt: form.variables?.length
+            ? `${prompt}\n\nAvailable template variables (use {{key}} syntax):\n${form.variables.map(v => `- {{${v.key}}}${v.label ? ` — ${v.label}` : ""}`).join("\n")}`
+            : prompt,
           currentHtml: form[contentField],
           objectType: objectType || null,
           objectKey: selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null,
+          imageData: imageData || undefined,
         }),
       });
       const data = await res.json();
@@ -141,13 +157,14 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       <div className="template-editor-grid">
         <div className="card">
           <div className="card-title">Template Source</div>
-          <div className="config-ref">
+          {!showVariables && <div className="config-ref">
             <strong>Variables:</strong>{" "}
             {Object.keys(config).map(k => <code key={k} className="var-tag">{`{{${k}}}`}</code>)}
-          </div>
+          </div>}
           <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
-          <div style={{ marginTop: 12 }}>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
             <button type="button" onClick={save} className="btn btn-primary">Save</button>
+            {saved && <span className="toast-saved">✓ Saved</span>}
           </div>
         </div>
         <div className="card">
@@ -161,6 +178,13 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
             ))}
           </div>
           <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={12} className="form-input" placeholder="Describe what you want to generate…" />
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", fontSize: 12 }}>
+              📎 {imageData ? "Image attached" : "Attach image"}
+              <input type="file" accept="image/*" onChange={handleImage} hidden />
+            </label>
+            {imageData && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--danger)" }} onClick={() => setImageData(null)}>✕</button>}
+          </div>
           <div style={{ marginTop: 12 }}>
             <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || !prompt.trim()}>
               {generating ? "Generating…" : "Generate"}
@@ -168,6 +192,29 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
           </div>
         </div>
       </div>
+
+      {/* Page Variables (for section types) */}
+      {showVariables && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="card-title">Page Variables</div>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Define variables that will appear as input fields when this section is used in a page. Use <code>{"{{key}}"}</code> in the template above.</p>
+          {form.variables.map((v, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+              <input className="form-input" placeholder="key" value={v.key} style={{ width: 160, fontFamily: "monospace", fontSize: 13 }}
+                onChange={e => { const vars = [...form.variables]; vars[i] = { ...vars[i], key: e.target.value.replace(/[^a-z0-9_]/gi, "_").toLowerCase() }; setForm({ ...form, variables: vars }); }} />
+              <input className="form-input" placeholder="Label" value={v.label} style={{ flex: 1, fontSize: 13 }}
+                onChange={e => { const vars = [...form.variables]; vars[i] = { ...vars[i], label: e.target.value }; setForm({ ...form, variables: vars }); }} />
+              <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
+                onClick={() => setForm({ ...form, variables: form.variables.filter((_, j) => j !== i) })}>✕</button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setForm({ ...form, variables: [...form.variables, { key: "", label: "" }] })}>+ Add Variable</button>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" onClick={save} className="btn btn-primary btn-sm">Save</button>
+            {saved && <span className="toast-saved">✓ Saved</span>}
+          </div>
+        </div>
+      )}
 
       {/* Prompt editors */}
       {objectType && (

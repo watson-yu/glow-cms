@@ -7,11 +7,12 @@ export default function EditPage() {
   const { id } = useParams();
   const router = useRouter();
   const isNew = id === "new";
-  const [form, setForm] = useState({ title: "", slug: "", header_id: "", footer_id: "", page_template_id: "", status: "draft", sections: [] });
+  const [form, setForm] = useState({ title: "", slug: "", header_id: "", footer_id: "", page_template_id: "", status: "draft", category_id: "", sections: [] });
   const [headers, setHeaders] = useState([]);
   const [footers, setFooters] = useState([]);
   const [pageTemplates, setPageTemplates] = useState([]);
   const [sectionTypes, setSectionTypes] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [contentPath, setContentPath] = useState("");
 
   useEffect(() => {
@@ -21,11 +22,13 @@ export default function EditPage() {
       fetch("/api/page-templates").then(r => r.json()),
       fetch("/api/section-types").then(r => r.json()),
       fetch("/api/site-config").then(r => r.json()),
-    ]).then(([h, f, pt, st, c]) => {
+      fetch("/api/categories").then(r => r.json()),
+    ]).then(([h, f, pt, st, c, cats]) => {
       setHeaders(h);
       setFooters(f);
       setPageTemplates(pt);
       setSectionTypes(st);
+      setCategories(cats);
       const cp = c.content_path || "";
       setContentPath(!cp || cp === "/" ? "" : cp.startsWith("/") ? cp : `/${cp}`);
       if (isNew) {
@@ -33,7 +36,12 @@ export default function EditPage() {
       }
     });
     if (!isNew) fetch(`/api/pages/${id}`).then(r => r.json()).then(d => setForm({
-      ...d, header_id: d.header_id || "", footer_id: d.footer_id || "", page_template_id: d.page_template_id || "", sections: d.sections || []
+      ...d, header_id: d.header_id || "", footer_id: d.footer_id || "", page_template_id: d.page_template_id || "", category_id: d.category_id || "",
+      sections: (d.sections || []).map(s => ({
+        ...s,
+        variables: typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}),
+        type_variables: typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []),
+      }))
     }));
   }, [id, isNew]);
 
@@ -42,7 +50,8 @@ export default function EditPage() {
   function addSection(typeId) {
     const type = sectionTypes.find(t => t.id === Number(typeId));
     if (!type) return;
-    setForm({ ...form, sections: [...form.sections, { section_type_id: type.id, type_name: type.name, content: type.default_content || "" }] });
+    const typVars = typeof type.variables === "string" ? JSON.parse(type.variables || "[]") : (type.variables || []);
+    setForm({ ...form, sections: [...form.sections, { section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {} }] });
   }
 
   function removeSection(i) {
@@ -78,6 +87,16 @@ export default function EditPage() {
               <option value="published">Published</option>
             </select>
           </div>
+          <div className="form-field">
+            <label>Category</label>
+            <select value={form.category_id} onChange={set("category_id")} className="form-input">
+              <option value="">— None —</option>
+              {categories.map(p => [
+                <option key={p.id} value={p.id}>{p.name}</option>,
+                ...p.children.map(c => <option key={c.id} value={c.id}>&nbsp;&nbsp;↳ {c.name}</option>)
+              ])}
+            </select>
+          </div>
         </div>
 
         <div className="card">
@@ -104,14 +123,25 @@ export default function EditPage() {
                 <button type="button" onClick={() => removeSection(i)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Remove</button>
               </div>
               <textarea value={s.content || ""} onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], content: e.target.value }; setForm({ ...form, sections: sec }); }} rows={5} className="form-input" />
+              {s.type_variables?.length > 0 && (
+                <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, fontWeight: 500 }}>Variables</div>
+                  {s.type_variables.map(v => (
+                    <div key={v.key} className="form-field" style={{ marginBottom: 6 }}>
+                      <label style={{ fontSize: 13 }}>{v.label || v.key}</label>
+                      <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""}
+                        onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value } }; setForm({ ...form, sections: sec }); }} />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
           <div className="add-section-row">
-            <select id="addType" className="form-input" defaultValue="">
-              <option value="" disabled>Select section type…</option>
+            <select className="form-input" value="" onChange={e => { if (e.target.value) addSection(e.target.value); }}>
+              <option value="" disabled>+ Add section…</option>
               {sectionTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => { const sel = document.getElementById("addType"); if (sel.value) { addSection(sel.value); sel.value = ""; } }}>+ Add</button>
           </div>
         </div>
 

@@ -14,15 +14,15 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const { title, slug, header_id, footer_id, page_template_id, status, sections } = await req.json();
+  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
   const [result] = await pool.query(
-    "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status) VALUES (?, ?, ?, ?, ?, ?)",
-    [title, slug, header_id || null, footer_id || null, page_template_id || 1, status || "draft"]
+    "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [title, slug, header_id || null, footer_id || null, page_template_id || 1, status || "draft", category_id || null]
   );
   const pageId = result.insertId;
   if (sections?.length) {
-    const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, i]);
-    await pool.query("INSERT INTO sections (page_id, section_type_id, content, sort_order) VALUES ?", [values]);
+    const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
+    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
   }
   return NextResponse.json({ id: pageId }, { status: 201 });
 }

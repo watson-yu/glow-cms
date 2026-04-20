@@ -36,7 +36,19 @@ CREATE TABLE IF NOT EXISTS section_types (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   default_content TEXT,
+  variables JSON DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL UNIQUE,
+  description TEXT,
+  parent_id INT DEFAULT NULL,
+  sort_order INT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_categories_parent FOREIGN KEY (parent_id) REFERENCES categories(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS pages (
@@ -49,9 +61,11 @@ CREATE TABLE IF NOT EXISTS pages (
   page_template_id INT DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  category_id INT DEFAULT NULL,
   CONSTRAINT fk_pages_header FOREIGN KEY (header_id) REFERENCES headers(id),
   CONSTRAINT fk_pages_footer FOREIGN KEY (footer_id) REFERENCES footers(id),
-  CONSTRAINT fk_pages_template FOREIGN KEY (page_template_id) REFERENCES page_templates(id)
+  CONSTRAINT fk_pages_template FOREIGN KEY (page_template_id) REFERENCES page_templates(id),
+  CONSTRAINT fk_pages_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS sections (
@@ -59,6 +73,7 @@ CREATE TABLE IF NOT EXISTS sections (
   page_id INT NOT NULL,
   section_type_id INT NOT NULL,
   content TEXT,
+  variables JSON DEFAULT NULL,
   sort_order INT DEFAULT 0,
   CONSTRAINT fk_sections_page FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
   CONSTRAINT fk_sections_type FOREIGN KEY (section_type_id) REFERENCES section_types(id)

@@ -7,7 +7,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const { name, default_content } = await req.json();
-  const [r] = await pool.query("INSERT INTO section_types (name, default_content) VALUES (?, ?)", [name, default_content]);
+  const { name, default_content, variables } = await req.json();
+  const [r] = await pool.query("INSERT INTO section_types (name, default_content, variables) VALUES (?, ?, ?)", [name, default_content, JSON.stringify(variables || [])]);
   return NextResponse.json({ id: r.insertId }, { status: 201 });
 }

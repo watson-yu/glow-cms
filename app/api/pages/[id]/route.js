@@ -15,7 +15,7 @@ export async function GET(req, { params }) {
   `, [id]);
   if (!pages.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const [sections] = await pool.query(`
-    SELECT s.*, st.name as type_name FROM sections s
+    SELECT s.*, st.name as type_name, st.variables as type_variables FROM sections s
     JOIN section_types st ON s.section_type_id = st.id
     WHERE s.page_id = ? ORDER BY s.sort_order
   `, [id]);
@@ -24,15 +24,15 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   const { id } = await params;
-  const { title, slug, header_id, footer_id, page_template_id, status, sections } = await req.json();
+  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
   await pool.query(
-    "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=? WHERE id=?",
-    [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, id]
+    "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
+    [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
   );
   await pool.query("DELETE FROM sections WHERE page_id = ?", [id]);
   if (sections?.length) {
-    const values = sections.map((s, i) => [id, s.section_type_id, s.content, i]);
-    await pool.query("INSERT INTO sections (page_id, section_type_id, content, sort_order) VALUES ?", [values]);
+    const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
+    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
   }
   return NextResponse.json({ ok: true });
 }

@@ -82,7 +82,8 @@ a { color: inherit; text-decoration: none; }
   margin-top: var(--header-height);
   margin-left: var(--sidebar-width);
   padding: 32px;
-  min-height: calc(100vh - var(--header-height));
+  height: calc(100vh - var(--header-height));
+  overflow-y: auto;
   background: var(--bg);
 }
 

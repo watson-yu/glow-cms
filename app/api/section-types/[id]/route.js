@@ -10,8 +10,8 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   const { id } = await params;
-  const { name, default_content } = await req.json();
-  await pool.query("UPDATE section_types SET name=?, default_content=? WHERE id=?", [name, default_content, id]);
+  const { name, default_content, variables } = await req.json();
+  await pool.query("UPDATE section_types SET name=?, default_content=?, variables=? WHERE id=?", [name, default_content, JSON.stringify(variables || []), id]);
   return NextResponse.json({ ok: true });
 }
 

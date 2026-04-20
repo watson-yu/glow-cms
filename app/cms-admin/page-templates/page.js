@@ -23,7 +23,7 @@ export default function PageTemplatesPage() {
     return (
       <>
         {header && <div dangerouslySetInnerHTML={{ __html: header }} />}
-        <div style={{ maxWidth: 900, margin: "0 auto", padding: "20px" }} dangerouslySetInnerHTML={{ __html: body }} />
+        <div dangerouslySetInnerHTML={{ __html: body }} />
         {footer && <div dangerouslySetInnerHTML={{ __html: footer }} />}
       </>
     );
