@@ -25,7 +25,7 @@ export async function GET(req) {
 }
 
 export async function POST(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 
@@ -58,7 +58,7 @@ export async function POST(req) {
 
 // PUT /api/prompts — activate a specific version
 export async function PUT(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

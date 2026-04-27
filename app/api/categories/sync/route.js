@@ -18,8 +18,8 @@ function validateSelectQuery(sql) {
   return /^SELECT\s/i.test(trimmed) && !/;\s*\S/.test(trimmed);
 }
 
-export async function POST() {
-  const authError = await requireAuth();
+export async function POST(req) {
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

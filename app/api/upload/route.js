@@ -19,7 +19,7 @@ const ALLOWED_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "
 const MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 export async function POST(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 
@@ -50,7 +50,7 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

@@ -19,7 +19,7 @@ function originOf(origins, vars, key) {
 }
 
 export async function POST(req, { params }) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

@@ -44,7 +44,7 @@ export async function GET() {
 const DB_KEYS = { db_host: "host", db_port: "port", db_user: "user", db_password: "password", db_name: "database" };
 
 export async function PUT(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

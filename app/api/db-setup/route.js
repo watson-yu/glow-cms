@@ -16,7 +16,7 @@ export async function POST(req) {
   try {
     // First-time setup: allow without auth. Reconfiguration: require auth.
     if (isDbConfigured()) {
-      const authError = await requireAuth();
+      const authError = await requireAuth(req);
       if (authError) return authError;
     }
 

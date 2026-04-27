@@ -4,7 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import { validId, validString, validSlug, err } from "@/lib/validate";
 
 export async function PUT(req, { params }) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 
@@ -22,7 +22,7 @@ export async function PUT(req, { params }) {
 }
 
 export async function DELETE(req, { params }) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

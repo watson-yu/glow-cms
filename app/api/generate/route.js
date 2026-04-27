@@ -57,7 +57,7 @@ async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
 }
 
 export async function POST(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 

@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function PUT(req) {
-  const authError = await requireAuth();
+  const authError = await requireAuth(req);
   if (authError) return authError;
   try {
 
