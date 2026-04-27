@@ -5,7 +5,12 @@ export async function GET(req, { params }) {
   const { id } = await params;
   const [rows] = await pool.query("SELECT * FROM page_templates WHERE id = ?", [id]);
   if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  const [sections] = await pool.query("SELECT * FROM page_template_sections WHERE page_template_id = ? ORDER BY sort_order", [id]);
+  let sections = [];
+  try {
+    [sections] = await pool.query("SELECT * FROM page_template_sections WHERE page_template_id = ? ORDER BY sort_order", [id]);
+  } catch {
+    // table may not exist yet (migration pending)
+  }
   return NextResponse.json({ ...rows[0], sections });
 }
 
