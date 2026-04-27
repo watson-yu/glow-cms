@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
+import { sanitizeHtml } from "@/lib/sanitize";
 
 async function getKey(key) {
   const [rows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
@@ -83,7 +84,7 @@ export async function POST(req) {
 
     const parts = [sysRow?.content, typeRow?.content, objRow?.content].filter(Boolean);
     const systemPrompt = parts.join("\n\n");
-    const userPrompt = `Current template:\n${currentHtml || "(empty)"}\n\nRequest: ${prompt}`;
+    const userPrompt = `<current_template>\n${currentHtml || "(empty)"}\n</current_template>\n\n<user_request>\n${prompt}\n</user_request>`;
 
     try {
       const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
@@ -106,7 +107,7 @@ export async function POST(req) {
         ]
       );
 
-      return NextResponse.json({ html: result.html });
+      return NextResponse.json({ html: sanitizeHtml(result.html) });
     } catch (e) {
       console.error("LLM generation error:", e);
       return NextResponse.json({ error: "Generation failed" }, { status: 500 });
