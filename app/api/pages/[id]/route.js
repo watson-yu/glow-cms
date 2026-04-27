@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 
@@ -38,14 +39,24 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
-    await pool.query(
-      "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
-      [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
-    );
-    await pool.query("DELETE FROM sections WHERE page_id = ?", [id]);
-    if (sections?.length) {
-      const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
-      await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      await conn.query(
+        "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
+        [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
+      );
+      await conn.query("DELETE FROM sections WHERE page_id = ?", [id]);
+      if (sections?.length) {
+        const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
+        await conn.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
+      }
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
     return NextResponse.json({ ok: true });
   } catch (e) {

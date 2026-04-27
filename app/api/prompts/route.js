@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { getPool } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 
@@ -31,20 +32,24 @@ export async function POST(req) {
     const { scope_type, scope_key, content } = await req.json();
     if (!scope_key || !scope_type) return NextResponse.json({ error: "scope_type and scope_key required" }, { status: 400 });
 
-    // Get next version number
-    const [maxRow] = await pool.query("SELECT COALESCE(MAX(version),0) as mv FROM prompts WHERE scope_key = ?", [scope_key]);
-    const nextVersion = maxRow[0].mv + 1;
-
-    // Deactivate old
-    await pool.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
-
-    // Insert new active version
-    const [r] = await pool.query(
-      "INSERT INTO prompts (scope_type, scope_key, version, content, is_active) VALUES (?, ?, ?, ?, 1)",
-      [scope_type, scope_key, nextVersion, content || ""]
-    );
-
-    return NextResponse.json({ id: r.insertId, version: nextVersion }, { status: 201 });
+    const conn = await getPool().getConnection();
+    try {
+      await conn.beginTransaction();
+      const [maxRow] = await conn.query("SELECT COALESCE(MAX(version),0) as mv FROM prompts WHERE scope_key = ?", [scope_key]);
+      const nextVersion = maxRow[0].mv + 1;
+      await conn.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
+      const [r] = await conn.query(
+        "INSERT INTO prompts (scope_type, scope_key, version, content, is_active) VALUES (?, ?, ?, ?, 1)",
+        [scope_type, scope_key, nextVersion, content || ""]
+      );
+      await conn.commit();
+      return NextResponse.json({ id: r.insertId, version: nextVersion }, { status: 201 });
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
+    }
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
