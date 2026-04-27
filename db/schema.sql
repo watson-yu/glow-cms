@@ -29,7 +29,11 @@ CREATE TABLE IF NOT EXISTS page_templates (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
   content TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  header_id INT DEFAULT NULL,
+  footer_id INT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pt_header FOREIGN KEY (header_id) REFERENCES headers(id) ON DELETE SET NULL,
+  CONSTRAINT fk_pt_footer FOREIGN KEY (footer_id) REFERENCES footers(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS section_types (
@@ -38,6 +42,15 @@ CREATE TABLE IF NOT EXISTS section_types (
   default_content TEXT,
   variables JSON DEFAULT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS page_template_sections (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  page_template_id INT NOT NULL,
+  section_type_id INT NOT NULL,
+  sort_order INT DEFAULT 0,
+  CONSTRAINT fk_pts_template FOREIGN KEY (page_template_id) REFERENCES page_templates(id) ON DELETE CASCADE,
+  CONSTRAINT fk_pts_section_type FOREIGN KEY (section_type_id) REFERENCES section_types(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS categories (
