@@ -35,7 +35,12 @@ const TZ_OPTIONS = [
 function ProfileDropdown({ authConfigured }) {
   const { data: session } = useSession();
   const [open, setOpen] = useState(false);
-  const [tz, setTz] = useState(() => (typeof localStorage !== "undefined" && localStorage.getItem("glow-tz")) || "Asia/Taipei");
+  const [tz, setTz] = useState("Asia/Taipei");
+
+  useEffect(() => {
+    const saved = localStorage.getItem("glow-tz");
+    if (saved) setTz(saved);
+  }, []);
 
   function toggleTz(value) {
     setTz(value);
