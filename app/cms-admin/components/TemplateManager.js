@@ -157,6 +157,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }
 
   const objectKey = selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null;
+  const previewHtml = substituteVars(form[contentField], config, { stripUnresolved: !showVariables });
 
   return (
     <>
@@ -188,8 +189,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         <div className="card-title">Preview</div>
         <div className="template-preview">
           {renderPreview
-            ? renderPreview(substituteVars(form[contentField], config, { stripUnresolved: true }), { form, setForm })
-            : <SafeHtml html={substituteVars(form[contentField], config, { stripUnresolved: true }) || '<span style="color:var(--text-muted)">No content yet</span>'} />
+            ? renderPreview(previewHtml, { form, setForm })
+            : <SafeHtml html={previewHtml || '<span style="color:var(--text-muted)">No content yet</span>'} />
           }
         </div>
       </div>
