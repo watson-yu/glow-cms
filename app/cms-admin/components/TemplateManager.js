@@ -4,7 +4,7 @@ import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 import SafeHtml from "@/app/components/SafeHtml";
 
-export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra }) {
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState({ name: "", [contentField]: "", variables: [] });
@@ -159,6 +159,66 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const objectKey = selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null;
   const previewHtml = substituteVars(form[contentField], config, { stripUnresolved: !showVariables });
 
+  function editorAndPrompts() {
+    return (
+      <>
+        <div className="template-editor-grid">
+          <div className="card">
+            <div className="card-title">Template Source</div>
+            {!showVariables && <div className="config-ref">
+              <strong>Variables:</strong>{" "}
+              {Object.keys(config).map(k => <code key={k} className="var-tag">{`{{${k}}}`}</code>)}
+            </div>}
+            <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
+            <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+              <button type="button" onClick={save} className="btn btn-primary" disabled={saving}>Save</button>
+              {saved && <span className="toast-saved">✓ Saved</span>}
+              {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-title">AI Generate</div>
+            <div className="llm-radios">
+              {[["openai", "OpenAI"], ["claude", "Anthropic"], ["gemini", "Gemini"]].map(([val, label]) => (
+                <label key={val} className="llm-radio">
+                  <input type="radio" name="llm" value={val} checked={llmProvider === val} onChange={() => setLlmProvider(val)} />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={12} className="form-input" placeholder="Describe what you want to generate…" />
+            <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", fontSize: 12 }}>
+                📎 {imageData ? "Image attached" : "Attach image"}
+                <input type="file" accept="image/*" onChange={handleImage} hidden />
+              </label>
+              {imageData && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--danger)" }} onClick={() => setImageData(null)}>✕</button>}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || !prompt.trim()}>
+                {generating ? "Generating…" : "Generate"}
+              </button>
+            </div>
+          </div>
+        </div>
+        {objectType && (
+          <div className="template-editor-grid" style={{ marginTop: 20 }}>
+            <div className="card">
+              <PromptEditor scopeType="object_type" scopeKey={objectType} label={`${title} Type Prompt`} />
+              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies to all {title.toLowerCase()} when generating.</p>
+            </div>
+            {objectKey && (
+              <div className="card">
+                <PromptEditor key={objectKey} scopeType="object" scopeKey={objectKey} label={`"${form.name || "This Item"}" Prompt`} />
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies only to this specific item.</p>
+              </div>
+            )}
+          </div>
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       {/* Row 1: title + dropdown + Add New */}
@@ -183,6 +243,9 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         )}
         {saved && <span className="toast-saved">✓ Saved</span>}
       </div>
+
+      {/* Extra panels before preview when collapseEditor (e.g. blueprint config for page templates) */}
+      {collapseEditor && renderExtra && renderExtra({ form, setForm, selectedId, items, save, saving, saved, error })}
 
       {/* Preview */}
       <div className="card">
@@ -229,65 +292,19 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       {/* Content Source group */}
       {showVariables && <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12, color: "var(--text-secondary)" }}>Content Source</h2>}
 
-      {/* Extra panels (e.g. blueprint sections for page templates) */}
-      {renderExtra && renderExtra({ form, setForm, selectedId, items })}
+      {/* Extra panels in default position (non-collapseEditor mode) */}
+      {!collapseEditor && renderExtra && renderExtra({ form, setForm, selectedId, items })}
 
-      {/* Editor grid */}
-      <div className="template-editor-grid">
-        <div className="card">
-          <div className="card-title">Template Source</div>
-          {!showVariables && <div className="config-ref">
-            <strong>Variables:</strong>{" "}
-            {Object.keys(config).map(k => <code key={k} className="var-tag">{`{{${k}}}`}</code>)}
-          </div>}
-          <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
-          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" onClick={save} className="btn btn-primary" disabled={saving}>Save</button>
-            {saved && <span className="toast-saved">✓ Saved</span>}
-            {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
-          </div>
-        </div>
-        <div className="card">
-          <div className="card-title">AI Generate</div>
-          <div className="llm-radios">
-            {[["openai", "OpenAI"], ["claude", "Anthropic"], ["gemini", "Gemini"]].map(([val, label]) => (
-              <label key={val} className="llm-radio">
-                <input type="radio" name="llm" value={val} checked={llmProvider === val} onChange={() => setLlmProvider(val)} />
-                {label}
-              </label>
-            ))}
-          </div>
-          <textarea value={prompt} onChange={e => setPrompt(e.target.value)} rows={12} className="form-input" placeholder="Describe what you want to generate…" />
-          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
-            <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", fontSize: 12 }}>
-              📎 {imageData ? "Image attached" : "Attach image"}
-              <input type="file" accept="image/*" onChange={handleImage} hidden />
-            </label>
-            {imageData && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--danger)" }} onClick={() => setImageData(null)}>✕</button>}
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || !prompt.trim()}>
-              {generating ? "Generating…" : "Generate"}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Prompt editors — part of Content Source group */}
-      {objectType && (
-        <div className="template-editor-grid" style={{ marginTop: 20 }}>
-          <div className="card">
-            <PromptEditor scopeType="object_type" scopeKey={objectType} label={`${title} Type Prompt`} />
-            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies to all {title.toLowerCase()} when generating.</p>
-          </div>
-          {objectKey && (
-            <div className="card">
-              <PromptEditor key={objectKey} scopeType="object" scopeKey={objectKey} label={`"${form.name || "This Item"}" Prompt`} />
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies only to this specific item.</p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Editor grid + Prompt editors — optionally collapsed */}
+      {collapseEditor ? (
+        <details className="collapse-panel" style={{ marginTop: 20 }}>
+          <summary className="collapse-summary">Advanced: HTML Layout Wrapper</summary>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", margin: "12px 0" }}>
+            Optional HTML that wraps all page sections via <code>{"{{content}}"}</code>. Leave empty for no wrapper.
+          </p>
+          {editorAndPrompts()}
+        </details>
+      ) : editorAndPrompts()}
 
       {/* Propagation dialog */}
       {propagateDialog && (

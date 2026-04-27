@@ -37,7 +37,7 @@ export default function PageTemplatesPage() {
     const placeholder = sectionsHtml || '<div style="border:2px dashed var(--border);padding:24px;text-align:center;color:var(--text-muted);border-radius:8px;margin:16px 0">Page sections go here</div>';
     let body;
     if (!templateHtml) {
-      body = '<span style="color:var(--text-muted)">No content yet</span>';
+      body = placeholder;
     } else if (templateHtml.includes("{{content}}")) {
       body = templateHtml.replace("{{content}}", placeholder);
     } else {
@@ -52,7 +52,7 @@ export default function PageTemplatesPage() {
     );
   }
 
-  function renderExtra({ form, setForm }) {
+  function renderExtra({ form, setForm, save, saving, saved, error }) {
     return (
       <>
         {/* Header/Footer Selectors */}
@@ -110,10 +110,15 @@ export default function PageTemplatesPage() {
             <option value="">+ Add Section Type</option>
             {sectionTypes.map(st => <option key={st.id} value={st.id}>{st.name}</option>)}
           </select>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
+            <button type="button" onClick={save} className="btn btn-primary btn-sm" disabled={saving}>Save</button>
+            {saved && <span className="toast-saved">✓ Saved</span>}
+            {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
+          </div>
         </div>
       </>
     );
   }
 
-  return <TemplateManager apiPath="/api/page-templates" title="Page Templates" objectType="page_template" renderPreview={(html, extra) => renderPreview(html, extra)} renderExtra={renderExtra} />;
+  return <TemplateManager apiPath="/api/page-templates" title="Page Templates" objectType="page_template" renderPreview={(html, extra) => renderPreview(html, extra)} renderExtra={renderExtra} collapseEditor />;
 }
