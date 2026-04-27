@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const [rows] = await pool.query("SELECT * FROM page_templates ORDER BY id");
-  const [sections] = await pool.query("SELECT * FROM page_template_sections ORDER BY page_template_id, sort_order");
+  let sections = [];
+  try {
+    [sections] = await pool.query("SELECT * FROM page_template_sections ORDER BY page_template_id, sort_order");
+  } catch {
+    // table may not exist yet (migration pending)
+  }
   const sectionsByTemplate = {};
   for (const s of sections) {
     (sectionsByTemplate[s.page_template_id] ||= []).push(s);
