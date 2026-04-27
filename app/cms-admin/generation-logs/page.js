@@ -5,9 +5,17 @@ import { fmtDate, useTzRefresh } from "@/lib/fmt";
 export default function GenerationLogsPage() {
   const [logs, setLogs] = useState([]);
   const [expanded, setExpanded] = useState(null);
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const limit = 50;
   useTzRefresh();
 
-  useEffect(() => { fetch("/api/generation-logs").then(r => r.json()).then(setLogs); }, []);
+  useEffect(() => {
+    fetch(`/api/generation-logs?page=${page}&limit=${limit}`).then(r => r.json()).then(data => {
+      setLogs(data.rows || []);
+      setTotal(data.total || 0);
+    });
+  }, [page]);
 
   return (
     <>
@@ -60,6 +68,13 @@ export default function GenerationLogsPage() {
           </tbody>
         </table>
       </div>
+      {total > limit && (
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 16 }}>
+          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Prev</button>
+          <span style={{ fontSize: 13, color: "var(--text-muted)", lineHeight: "32px" }}>Page {page} of {Math.ceil(total / limit)}</span>
+          <button className="btn btn-secondary btn-sm" disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(p => p + 1)}>Next →</button>
+        </div>
+      )}
     </>
   );
 }

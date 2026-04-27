@@ -31,7 +31,7 @@ export async function POST(req) {
 
     const cfg = await getS3Config();
     const ext = ALLOWED_TYPES[file.type];
-    const key = `site/logo-${Date.now()}.${ext}`;
+    const key = `site/${crypto.randomUUID()}.${ext}`;
     const buffer = Buffer.from(await file.arrayBuffer());
 
     await getClient(cfg).send(new PutObjectCommand({
