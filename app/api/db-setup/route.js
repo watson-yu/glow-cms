@@ -8,11 +8,17 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const authError = await requireAuth();
-  if (authError) return authError;
+  // First-time setup: allow without auth. Reconfiguration: require auth.
+  if (isDbConfigured()) {
+    const authError = await requireAuth();
+    if (authError) return authError;
+  }
 
   const { host, user, password, database, port } = await req.json();
-  const config = { host, user, password, database, port: parseInt(port || "3306") };
+  if (!host || !database) return NextResponse.json({ ok: false, error: "host and database are required" }, { status: 400 });
+  const parsedPort = parseInt(port || "3306");
+  if (isNaN(parsedPort) || parsedPort < 1 || parsedPort > 65535) return NextResponse.json({ ok: false, error: "Invalid port" }, { status: 400 });
+  const config = { host, user, password, database, port: parsedPort };
 
   try {
     const conn = await mysql.createConnection(config);
