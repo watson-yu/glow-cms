@@ -28,13 +28,21 @@ export default function PageTemplatesPage() {
     if (form.sections?.length) {
       sectionsHtml = form.sections.map(s => {
         const st = sectionTypes.find(t => t.id === s.section_type_id);
-        return st ? substituteVars(st.default_content || "", config, { stripUnresolved: true }) : "";
+        return st?.default_content
+          ? substituteVars(st.default_content, config, { stripUnresolved: true })
+          : `<div style="border:2px dashed var(--border);padding:16px;text-align:center;color:var(--text-muted);border-radius:8px;margin:8px 0">[${st?.name || 'Section'}]</div>`;
       }).join("\n");
     }
 
-    const body = templateHtml
-      ? templateHtml.replace("{{content}}", sectionsHtml || '<div style="border:2px dashed var(--border);padding:24px;text-align:center;color:var(--text-muted);border-radius:8px;margin:16px 0">Page sections go here</div>')
-      : '<span style="color:var(--text-muted)">No content yet</span>';
+    const placeholder = sectionsHtml || '<div style="border:2px dashed var(--border);padding:24px;text-align:center;color:var(--text-muted);border-radius:8px;margin:16px 0">Page sections go here</div>';
+    let body;
+    if (!templateHtml) {
+      body = '<span style="color:var(--text-muted)">No content yet</span>';
+    } else if (templateHtml.includes("{{content}}")) {
+      body = templateHtml.replace("{{content}}", placeholder);
+    } else {
+      body = templateHtml + placeholder;
+    }
     return (
       <>
         {header && <SafeHtml html={header} />}
