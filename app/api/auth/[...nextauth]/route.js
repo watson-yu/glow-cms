@@ -65,10 +65,11 @@ async function handler(req, ctx) {
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  // Auto-detect NEXTAUTH_URL from request
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  if (host) process.env.NEXTAUTH_URL = `${proto}://${host}`;
+  // Use NEXTAUTH_URL from env if already set; otherwise derive from Host header (not x-forwarded-*)
+  if (!process.env.NEXTAUTH_URL) {
+    const host = req.headers.get("host");
+    if (host) process.env.NEXTAUTH_URL = `${req.nextUrl.protocol}//${host}`;
+  }
   return NextAuth(req, ctx, authOptions);
 }
 
