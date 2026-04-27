@@ -97,7 +97,7 @@ export default function CategoriesPage() {
 
   async function clearAll() {
     if (!confirm("Delete ALL categories? This cannot be undone.")) return;
-    await fetch("/api/categories/clear", { method: "POST" });
+    await fetch("/api/categories/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
     load();
   }
 
