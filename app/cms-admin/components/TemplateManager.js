@@ -92,14 +92,20 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   async function propagate(action) {
     setPropagating(true);
-    await fetch(`${apiPath}/${selectedId}/propagate`, {
+    const res = await fetch(`${apiPath}/${selectedId}/propagate`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action }),
     });
+    const result = await res.json();
     setPropagating(false);
     setPropagateDialog(null);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    if (result.failed) {
+      setError(`Updated ${result.updated}, failed ${result.failed}`);
+      setTimeout(() => setError(null), 5000);
+    } else {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
   }
 
   async function remove() {

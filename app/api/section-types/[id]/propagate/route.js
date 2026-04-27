@@ -108,6 +108,7 @@ export async function POST(req, { params }) {
     const systemPrompt = await getPromptStack(id);
 
     let updated = 0;
+    let failed = 0;
     for (const s of sections) {
       const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
       const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
@@ -136,9 +137,12 @@ export async function POST(req, { params }) {
         await pool.query("UPDATE sections SET variables = ?, variable_origins = ? WHERE id = ?",
           [JSON.stringify(vars), JSON.stringify(origins), s.id]);
         updated++;
-      } catch (e) { /* skip failed generations */ }
+      } catch (e) {
+        console.error(`Propagation failed for section ${s.id}:`, e);
+        failed++;
+      }
     }
-    return NextResponse.json({ updated, action });
+    return NextResponse.json({ updated, failed, action });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
