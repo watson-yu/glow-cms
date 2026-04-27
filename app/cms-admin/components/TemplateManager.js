@@ -55,6 +55,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   async function saveName() {
     if (selectedId === "new" || !selectedId || saving) return;
+    if (!form.name.trim()) { setError("Name is required"); return; }
     setSaving(true); setError(null);
     const res = await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
     setSaving(false);
@@ -66,6 +67,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   async function save() {
     if (saving) return;
+    if (!form.name.trim()) { setError("Name is required"); return; }
     setSaving(true); setError(null);
     const url = selectedId === "new" ? apiPath : `${apiPath}/${selectedId}`;
     const method = selectedId === "new" ? "POST" : "PUT";
@@ -82,7 +84,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       // Check usage for section types
       if (showVariables && selectedId !== "new") {
         const usage = await (await fetch(`${apiPath}/${selectedId}/usage`)).json();
-        if (usage.count > 0) { setSaving(false); setPropagateDialog(usage); return; }
+        if (usage.count > 0) { setSaving(false); setSaved(true); setTimeout(() => setSaved(false), 2000); setPropagateDialog(usage); return; }
       }
     }
     setSaving(false);
@@ -109,7 +111,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }
 
   async function remove() {
-    if (!confirm("Delete this item?")) return;
+    if (!confirm(`Delete "${form.name}"?`)) return;
     await fetch(`${apiPath}/${selectedId}`, { method: "DELETE" });
     const data = await (await fetch(apiPath)).json();
     setItems(data);
@@ -163,6 +165,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <h1>{title}</h1>
           <select value={selectedId === "new" ? "__new__" : selectedId || ""} onChange={handleSelect} className="form-input" style={{ width: 200 }} aria-label={`Select ${title}`}>
+            {selectedId === "new" && <option value="__new__">— New —</option>}
             {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
         </div>
