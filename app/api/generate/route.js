@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { requireAuth } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 async function getKey(key) {
   const [rows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
@@ -61,6 +62,14 @@ export async function POST(req) {
 
   const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
   if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
+  if (prompt.length > 10_000 || (currentHtml && currentHtml.length > 100_000)) {
+    return NextResponse.json({ error: "Input too large" }, { status: 400 });
+  }
+
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (!rateLimit(`generate:${ip}`, 10, 60_000)) {
+    return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
+  }
 
   const keyMap = { openai: "openai_api_key", claude: "claude_api_key", gemini: "gemini_api_key" };
   const apiKey = await getKey(keyMap[provider] || keyMap.gemini);
