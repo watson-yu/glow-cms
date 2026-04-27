@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { validString, validSlug, err } from "@/lib/validate";
 
 export async function GET() {
   const authError = await requireAuth();
@@ -23,6 +24,8 @@ export async function POST(req) {
   try {
 
     const { name, slug, parent_id } = await req.json();
+    if (!validString(name, 200)) return err("name is required (max 200 chars)");
+    if (slug && !validSlug(slug)) return err("slug must be lowercase alphanumeric with hyphens");
     if (parent_id) {
       const [parent] = await pool.query("SELECT parent_id FROM categories WHERE id = ?", [parent_id]);
       if (!parent.length) return NextResponse.json({ error: "Parent not found" }, { status: 400 });

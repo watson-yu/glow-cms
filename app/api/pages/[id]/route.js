@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { getPool } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { validId, validString, validSlug, validStatus, err } from "@/lib/validate";
 
 export async function GET(req, { params }) {
   const authError = await requireAuth();
@@ -38,7 +39,11 @@ export async function PUT(req, { params }) {
   try {
 
     const { id } = await params;
+    if (!validId(id)) return err("Invalid ID");
     const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
+    if (!validString(title, 500)) return err("title is required (max 500 chars)");
+    if (!validSlug(slug)) return err("slug must be lowercase alphanumeric with hyphens");
+    if (status && !validStatus(status)) return err("status must be draft or published");
     const conn = await getPool().getConnection();
     try {
       await conn.beginTransaction();

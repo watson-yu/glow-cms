@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { validString, validSlug, validStatus, err } from "@/lib/validate";
 
 export async function GET() {
   const authError = await requireAuth();
@@ -28,6 +29,9 @@ export async function POST(req) {
   try {
 
     const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
+    if (!validString(title, 500)) return err("title is required (max 500 chars)");
+    if (!validSlug(slug)) return err("slug must be lowercase alphanumeric with hyphens");
+    if (status && !validStatus(status)) return err("status must be draft or published");
     const [result] = await pool.query(
       "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [title, slug, header_id || null, footer_id || null, page_template_id || 1, status || "draft", category_id || null]

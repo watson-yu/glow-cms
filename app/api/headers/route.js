@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
+import { validId, validString, err } from "@/lib/validate";
 
 export async function GET() {
   const authError = await requireAuth();
@@ -21,6 +22,7 @@ export async function POST(req) {
   try {
 
     const { name, content } = await req.json();
+    if (!validString(name, 200)) return err("name is required (max 200 chars)");
     const [r] = await pool.query("INSERT INTO headers (name, content) VALUES (?, ?)", [name, content]);
     return NextResponse.json({ id: r.insertId }, { status: 201 });
   } catch (e) {
