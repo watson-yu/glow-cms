@@ -241,6 +241,10 @@ select.form-input { cursor: pointer; }
   .template-editor-grid { grid-template-columns: 1fr 1fr; }
 }
 
+/* Collapsible panel */
+.collapse-panel { border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+.collapse-summary { cursor: pointer; font-size: 15px; font-weight: 600; color: var(--text-secondary); }
+
 /* LLM provider radios */
 .llm-radios {
   display: flex; gap: 16px; margin-bottom: 12px;
