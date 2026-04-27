@@ -59,54 +59,60 @@ async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
 export async function POST(req) {
   const authError = await requireAuth();
   if (authError) return authError;
-
-  const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
-  if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
-  if (prompt.length > 10_000 || (currentHtml && currentHtml.length > 100_000)) {
-    return NextResponse.json({ error: "Input too large" }, { status: 400 });
-  }
-
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  if (!rateLimit(`generate:${ip}`, 10, 60_000)) {
-    return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
-  }
-
-  const keyMap = { openai: "openai_api_key", claude: "claude_api_key", gemini: "gemini_api_key" };
-  const apiKey = await getKey(keyMap[provider] || keyMap.gemini);
-  if (!apiKey) return NextResponse.json({ error: `No API key configured for ${provider}` }, { status: 400 });
-
-  // Fetch prompt rows for logging
-  const sysRow = await getActivePromptRow("system");
-  const typeRow = objectType ? await getActivePromptRow(objectType) : null;
-  const objRow = objectKey ? await getActivePromptRow(objectKey) : null;
-
-  const parts = [sysRow?.content, typeRow?.content, objRow?.content].filter(Boolean);
-  const systemPrompt = parts.join("\n\n");
-  const userPrompt = `Current template:\n${currentHtml || "(empty)"}\n\nRequest: ${prompt}`;
-
   try {
-    const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
-    const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
 
-    // Log generation
-    await pool.query(
-      `INSERT INTO generation_logs (provider, model, object_type, object_key,
-        system_prompt_id, system_prompt_version,
-        type_prompt_id, type_prompt_version,
-        object_prompt_id, object_prompt_version,
-        user_prompt, current_html, response_html)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        provider, result.model, objectType || null, objectKey || null,
-        sysRow?.id || null, sysRow?.version || null,
-        typeRow?.id || null, typeRow?.version || null,
-        objRow?.id || null, objRow?.version || null,
-        prompt, currentHtml || null, result.html,
-      ]
-    );
+    const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
+    if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
+    if (prompt.length > 10_000 || (currentHtml && currentHtml.length > 100_000)) {
+      return NextResponse.json({ error: "Input too large" }, { status: 400 });
+    }
 
-    return NextResponse.json({ html: result.html });
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (!rateLimit(`generate:${ip}`, 10, 60_000)) {
+      return NextResponse.json({ error: "Rate limit exceeded. Try again in a minute." }, { status: 429 });
+    }
+
+    const keyMap = { openai: "openai_api_key", claude: "claude_api_key", gemini: "gemini_api_key" };
+    const apiKey = await getKey(keyMap[provider] || keyMap.gemini);
+    if (!apiKey) return NextResponse.json({ error: `No API key configured for ${provider}` }, { status: 400 });
+
+    // Fetch prompt rows for logging
+    const sysRow = await getActivePromptRow("system");
+    const typeRow = objectType ? await getActivePromptRow(objectType) : null;
+    const objRow = objectKey ? await getActivePromptRow(objectKey) : null;
+
+    const parts = [sysRow?.content, typeRow?.content, objRow?.content].filter(Boolean);
+    const systemPrompt = parts.join("\n\n");
+    const userPrompt = `Current template:\n${currentHtml || "(empty)"}\n\nRequest: ${prompt}`;
+
+    try {
+      const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
+      const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
+
+      // Log generation
+      await pool.query(
+        `INSERT INTO generation_logs (provider, model, object_type, object_key,
+          system_prompt_id, system_prompt_version,
+          type_prompt_id, type_prompt_version,
+          object_prompt_id, object_prompt_version,
+          user_prompt, current_html, response_html)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          provider, result.model, objectType || null, objectKey || null,
+          sysRow?.id || null, sysRow?.version || null,
+          typeRow?.id || null, typeRow?.version || null,
+          objRow?.id || null, objRow?.version || null,
+          prompt, currentHtml || null, result.html,
+        ]
+      );
+
+      return NextResponse.json({ html: result.html });
+    } catch (e) {
+      console.error("LLM generation error:", e);
+      return NextResponse.json({ error: "Generation failed" }, { status: 500 });
+    }
   } catch (e) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
+    console.error(e);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

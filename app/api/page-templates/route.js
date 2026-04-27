@@ -5,16 +5,26 @@ import { requireAuth } from "@/lib/auth";
 export async function GET() {
   const authError = await requireAuth();
   if (authError) return authError;
+  try {
 
-  const [rows] = await pool.query("SELECT * FROM page_templates ORDER BY id");
-  return NextResponse.json(rows);
+    const [rows] = await pool.query("SELECT * FROM page_templates ORDER BY id");
+    return NextResponse.json(rows);
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
 
 export async function POST(req) {
   const authError = await requireAuth();
   if (authError) return authError;
+  try {
 
-  const { name, content } = await req.json();
-  const [r] = await pool.query("INSERT INTO page_templates (name, content) VALUES (?, ?)", [name, content]);
-  return NextResponse.json({ id: r.insertId }, { status: 201 });
+    const { name, content } = await req.json();
+    const [r] = await pool.query("INSERT INTO page_templates (name, content) VALUES (?, ?)", [name, content]);
+    return NextResponse.json({ id: r.insertId }, { status: 201 });
+  } catch (e) {
+    console.error(e);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
