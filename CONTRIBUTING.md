@@ -4,7 +4,7 @@
 
 - Read [AGENT.md](./AGENT.md) for the current architecture and conventions.
 - Keep changes focused. This project is still evolving quickly.
-- Do not introduce `.env`-based setup. Glow CMS intentionally stores runtime configuration in MySQL, with local DB bootstrap handled through the app and checked-in schema.
+- Do not introduce `.env`-based setup for runtime configuration beyond DB credentials. Glow CMS intentionally stores runtime configuration in MySQL. DB credentials are resolved by `lib/db.js`: `.env.local` vars take priority when present, otherwise `.db-config.json` (gitignored, written by the admin DB Setup screen) is used.
 
 ## Local Setup
 

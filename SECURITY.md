@@ -18,11 +18,12 @@ If you already have a private contact channel with the maintainer, use that. Oth
 Security-sensitive areas in this project include:
 
 - Admin authentication and session handling
-- Database connection and setup flow
+- Database connection and setup flow (`.db-config.json`)
 - System configuration storage
 - LLM provider credentials
 - Google OAuth credentials
 - AWS S3 credentials and upload handling
+- External database connection credentials (category sync)
 
 ## Expectations For Contributors
 
