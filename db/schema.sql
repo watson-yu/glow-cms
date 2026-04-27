@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS sections (
   section_type_id INT NOT NULL,
   content TEXT,
   variables JSON DEFAULT NULL,
+  variable_origins JSON DEFAULT NULL,
   sort_order INT DEFAULT 0,
   CONSTRAINT fk_sections_page FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE,
   CONSTRAINT fk_sections_type FOREIGN KEY (section_type_id) REFERENCES section_types(id)
