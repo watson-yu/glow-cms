@@ -30,7 +30,7 @@ export async function POST(req, { params }) {
 
     const [types] = await pool.query("SELECT * FROM section_types WHERE id = ?", [id]);
     if (!types.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    const typeVars = JSON.parse(types[0].variables || "[]");
+    const typeVars = (() => { try { return JSON.parse(types[0].variables || "[]"); } catch { return []; } })();
 
     const [sections] = await pool.query(
       `SELECT s.id, s.page_id, s.variables, s.variable_origins,
@@ -50,8 +50,8 @@ export async function POST(req, { params }) {
     if (action === "fill_fixed") {
       let updated = 0;
       for (const s of sections) {
-        const vars = JSON.parse(s.variables || "{}");
-        const origins = JSON.parse(s.variable_origins || "{}");
+        const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
+        const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
         const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
         let changed = false;
         for (const v of typeVars) {
@@ -74,8 +74,8 @@ export async function POST(req, { params }) {
     if (action === "refresh_fixed") {
       let updated = 0;
       for (const s of sections) {
-        const vars = JSON.parse(s.variables || "{}");
-        const origins = JSON.parse(s.variable_origins || "{}");
+        const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
+        const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
         const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
         let changed = false;
         for (const v of typeVars) {
@@ -109,8 +109,8 @@ export async function POST(req, { params }) {
 
     let updated = 0;
     for (const s of sections) {
-      const vars = JSON.parse(s.variables || "{}");
-      const origins = JSON.parse(s.variable_origins || "{}");
+      const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
+      const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
       const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
 
       const toGenerate = typeVars.filter(v => {

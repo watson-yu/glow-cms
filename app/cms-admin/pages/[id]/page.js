@@ -46,8 +46,8 @@ export default function ViewPage() {
       )}
 
       {page.sections?.map((s, i) => {
-        const typeVars = typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []);
-        const pageVars = typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {});
+        const typeVars = (() => { try { return typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []); } catch { return []; } })();
+        const pageVars = (() => { try { return typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}); } catch { return {}; } })();
         const defaults = {};
         const ctx = { ...config, title: page.title, slug: page.slug };
         for (const v of typeVars) {

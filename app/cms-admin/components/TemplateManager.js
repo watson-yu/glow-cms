@@ -35,7 +35,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   function selectItem(item) {
     setSelectedId(item.id);
-    const vars = typeof item.variables === "string" ? JSON.parse(item.variables || "[]") : (item.variables || []);
+    const vars = (() => { try { return typeof item.variables === "string" ? JSON.parse(item.variables || "[]") : (item.variables || []); } catch { return []; } })();
     setForm({ name: item.name, [contentField]: item[contentField] || "", variables: vars });
     setPrompt("");
     setSaved(false);
