@@ -19,15 +19,15 @@ export default function PageTemplatesPage() {
   function renderPreview(templateHtml, { form }) {
     const hdr = headers.find(h => h.id === form.header_id);
     const ftr = footers.find(f => f.id === form.footer_id);
-    const header = hdr ? substituteVars(hdr.content, config) : "";
-    const footer = ftr ? substituteVars(ftr.content, config) : "";
+    const header = hdr ? substituteVars(hdr.content, config, { stripUnresolved: true }) : "";
+    const footer = ftr ? substituteVars(ftr.content, config, { stripUnresolved: true }) : "";
 
     // Render blueprint sections inside {{content}}
     let sectionsHtml = "";
     if (form.sections?.length) {
       sectionsHtml = form.sections.map(s => {
         const st = sectionTypes.find(t => t.id === s.section_type_id);
-        return st ? substituteVars(st.default_content || "", config) : "";
+        return st ? substituteVars(st.default_content || "", config, { stripUnresolved: true }) : "";
       }).join("\n");
     }
 
