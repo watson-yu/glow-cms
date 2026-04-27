@@ -162,7 +162,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       <div className="page-header">
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <h1>{title}</h1>
-          <select value={selectedId === "new" ? "__new__" : selectedId || ""} onChange={handleSelect} className="form-input" style={{ width: 200 }}>
+          <select value={selectedId === "new" ? "__new__" : selectedId || ""} onChange={handleSelect} className="form-input" style={{ width: 200 }} aria-label={`Select ${title}`}>
             {items.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
           </select>
         </div>
@@ -201,14 +201,16 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
               <input className="form-input" placeholder="key" value={v.key} style={{ width: 160, fontFamily: "monospace", fontSize: 13 }}
                 onChange={e => { const vars = [...form.variables]; vars[i] = { ...vars[i], key: e.target.value.replace(/[^a-z0-9_]/gi, "_").toLowerCase() }; setForm({ ...form, variables: vars }); }} />
               <div style={{ display: "flex", borderRadius: 10, overflow: "hidden", border: "1px solid var(--border)", fontSize: 11, whiteSpace: "nowrap", flexShrink: 0 }}>
-                <span onClick={() => { const vars = [...form.variables]; vars[i] = { ...vars[i], type: "prompt" }; setForm({ ...form, variables: vars }); }}
-                  style={{ padding: "2px 8px", cursor: "pointer", background: (v.type || "prompt") === "prompt" ? "var(--border)" : "#fff", color: "var(--text)" }}>Prompt</span>
-                <span onClick={() => { const vars = [...form.variables]; vars[i] = { ...vars[i], type: "fixed" }; setForm({ ...form, variables: vars }); }}
-                  style={{ padding: "2px 8px", cursor: "pointer", background: (v.type || "prompt") === "fixed" ? "var(--border)" : "#fff", color: "var(--text)" }}>Fixed</span>
+                <button type="button" onClick={() => { const vars = [...form.variables]; vars[i] = { ...vars[i], type: "prompt" }; setForm({ ...form, variables: vars }); }}
+                  style={{ padding: "2px 8px", cursor: "pointer", background: (v.type || "prompt") === "prompt" ? "var(--border)" : "#fff", color: "var(--text)", border: "none", fontSize: 11 }}
+                  aria-pressed={(v.type || "prompt") === "prompt"}>Prompt</button>
+                <button type="button" onClick={() => { const vars = [...form.variables]; vars[i] = { ...vars[i], type: "fixed" }; setForm({ ...form, variables: vars }); }}
+                  style={{ padding: "2px 8px", cursor: "pointer", background: (v.type || "prompt") === "fixed" ? "var(--border)" : "#fff", color: "var(--text)", border: "none", fontSize: 11 }}
+                  aria-pressed={(v.type || "prompt") === "fixed"}>Fixed</button>
               </div>
               <input className="form-input" placeholder={(v.type || "prompt") === "prompt" ? "Prompt (supports {{category}})" : "Label"} value={v.label} style={{ flex: 1, fontSize: 13 }}
                 onChange={e => { const vars = [...form.variables]; vars[i] = { ...vars[i], label: e.target.value }; setForm({ ...form, variables: vars }); }} />
-              <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}
+              <button type="button" className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} aria-label="Remove variable"
                 onClick={() => setForm({ ...form, variables: form.variables.filter((_, j) => j !== i) })}>✕</button>
             </div>
           ))}

@@ -45,7 +45,7 @@ function ProfileDropdown({ authConfigured }) {
 
   return (
     <div style={{ position: "relative", marginLeft: "auto" }}>
-      <button onClick={() => setOpen(!open)} className="profile-btn" title={session?.user?.email || "Account"}>
+      <button onClick={() => setOpen(!open)} className="profile-btn" title={session?.user?.email || "Account"} aria-expanded={open} aria-haspopup="true" aria-label="Account menu">
         {session?.user?.image
           ? <img src={session.user.image} alt="" style={{ width: 28, height: 28, borderRadius: "50%" }} />
           : <span style={{ width: 28, height: 28, borderRadius: "50%", background: authConfigured ? "var(--border)" : "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>{authConfigured ? "👤" : "⚠️"}</span>

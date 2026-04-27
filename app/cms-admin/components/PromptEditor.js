@@ -62,6 +62,7 @@ export default function PromptEditor({ scopeType, scopeKey, label }) {
             onChange={e => activateVersion(Number(e.target.value))}
             className="form-input"
             style={{ width: "auto", fontSize: 13 }}
+            aria-label="Prompt version"
           >
             {versions.map(v => (
               <option key={v.version} value={v.version}>

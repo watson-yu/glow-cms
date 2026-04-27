@@ -36,7 +36,7 @@ export default function Home() {
         <Link href="/cms-admin/pages/new/edit" className="btn btn-primary">+ Add New</Link>
       </div>
       <div className="table-wrap">
-        <table>
+        <table aria-label="Pages list">
           <thead>
             <tr><th>Title</th><th>URL</th><th>Status</th><th>Actions</th></tr>
           </thead>
