@@ -13,6 +13,11 @@ const DEFAULT_L1 = "SELECT id, zh_tw_name AS name, slug, zh_tw_description AS de
 const DEFAULT_L2 = `SELECT ct.category_id AS parent_id, t.id, t.zh_tw_name AS name, t.slug, t.zh_tw_description AS description, ct.is_primary, t.display_order
   FROM category_treatment ct JOIN treatments t ON ct.treatment_id = t.id ORDER BY ct.category_id, t.display_order`;
 
+function validateSelectQuery(sql) {
+  const trimmed = sql.trim().replace(/^\/\*.*?\*\//gs, "").trim();
+  return /^SELECT\s/i.test(trimmed) && !/;\s*\S/.test(trimmed);
+}
+
 export async function POST() {
   const authError = await requireAuth();
   if (authError) return authError;
@@ -22,14 +27,20 @@ export async function POST() {
     return NextResponse.json({ error: "External DB not configured" }, { status: 400 });
   }
 
+  const q1 = cfg.ext_db_query_l1 || DEFAULT_L1;
+  const q2 = cfg.ext_db_query_l2 || DEFAULT_L2;
+  if (!validateSelectQuery(q1) || !validateSelectQuery(q2)) {
+    return NextResponse.json({ error: "Sync queries must be SELECT statements" }, { status: 400 });
+  }
+
   const ext = await mysql.createConnection({
     host: cfg.ext_db_host, port: parseInt(cfg.ext_db_port || "3306"),
     user: cfg.ext_db_user, password: cfg.ext_db_password, database: cfg.ext_db_name,
   });
 
   try {
-    const [l1Rows] = await ext.query(cfg.ext_db_query_l1 || DEFAULT_L1);
-    const [l2Rows] = await ext.query(cfg.ext_db_query_l2 || DEFAULT_L2);
+    const [l1Rows] = await ext.query(q1);
+    const [l2Rows] = await ext.query(q2);
 
     // Upsert L1 (external categories → local parent categories)
     for (const r of l1Rows) {
