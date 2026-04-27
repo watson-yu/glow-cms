@@ -44,11 +44,11 @@ export default function PageTemplatesPage() {
       body = templateHtml + placeholder;
     }
     return (
-      <>
+      <div style={{ minHeight: 60 }}>
         {header && <SafeHtml html={header} />}
         <SafeHtml html={body} />
         {footer && <SafeHtml html={footer} />}
-      </>
+      </div>
     );
   }
 
