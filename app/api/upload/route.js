@@ -15,6 +15,9 @@ function getClient(cfg) {
   });
 }
 
+const ALLOWED_TYPES = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "image/gif": "gif" };
+const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+
 export async function POST(req) {
   const authError = await requireAuth();
   if (authError) return authError;
@@ -22,9 +25,11 @@ export async function POST(req) {
   const formData = await req.formData();
   const file = formData.get("file");
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
+  if (!ALLOWED_TYPES[file.type]) return NextResponse.json({ error: "File type not allowed" }, { status: 400 });
+  if (file.size > MAX_SIZE) return NextResponse.json({ error: "File too large (max 5MB)" }, { status: 400 });
 
   const cfg = await getS3Config();
-  const ext = file.name.split(".").pop();
+  const ext = ALLOWED_TYPES[file.type];
   const key = `site/logo-${Date.now()}.${ext}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -47,7 +52,9 @@ export async function DELETE(req) {
   if (!url) return NextResponse.json({ ok: true });
 
   const cfg = await getS3Config();
-  const key = url.split(".amazonaws.com/")[1];
+  const expectedPrefix = `https://${cfg.s3_bucket_name}.s3.${cfg.aws_region}.amazonaws.com/site/`;
+  if (!url.startsWith(expectedPrefix)) return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
+  const key = url.slice(url.indexOf(".amazonaws.com/") + 15);
   if (key) {
     await getClient(cfg).send(new DeleteObjectCommand({ Bucket: cfg.s3_bucket_name, Key: key }));
   }
