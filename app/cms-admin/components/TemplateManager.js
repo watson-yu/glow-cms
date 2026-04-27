@@ -4,7 +4,7 @@ import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 import SafeHtml from "@/app/components/SafeHtml";
 
-export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables }) {
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState({ name: "", [contentField]: "", variables: [] });
@@ -36,7 +36,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   function selectItem(item) {
     setSelectedId(item.id);
     const vars = (() => { try { return typeof item.variables === "string" ? JSON.parse(item.variables || "[]") : (item.variables || []); } catch { return []; } })();
-    setForm({ name: item.name, [contentField]: item[contentField] || "", variables: vars });
+    setForm({ name: item.name, [contentField]: item[contentField] || "", variables: vars, header_id: item.header_id || null, footer_id: item.footer_id || null, sections: item.sections || [] });
     setPrompt("");
     setSaved(false);
   }
@@ -48,7 +48,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   function addNew() {
     setSelectedId("new");
-    setForm({ name: "", [contentField]: "", variables: [] });
+    setForm({ name: "", [contentField]: "", variables: [], header_id: null, footer_id: null, sections: [] });
     setPrompt("");
     setSaved(false);
   }
@@ -188,8 +188,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         <div className="card-title">Preview</div>
         <div className="template-preview">
           {renderPreview
-            ? renderPreview(substituteVars(form[contentField], config))
-            : <SafeHtml html={substituteVars(form[contentField], config) || '<span style="color:var(--text-muted)">No content yet</span>'} />
+            ? renderPreview(substituteVars(form[contentField], config, { stripUnresolved: true }), { form, setForm })
+            : <SafeHtml html={substituteVars(form[contentField], config, { stripUnresolved: true }) || '<span style="color:var(--text-muted)">No content yet</span>'} />
           }
         </div>
       </div>
@@ -227,6 +227,9 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
       {/* Content Source group */}
       {showVariables && <h2 style={{ fontSize: 16, fontWeight: 600, marginTop: 28, marginBottom: 12, color: "var(--text-secondary)" }}>Content Source</h2>}
+
+      {/* Extra panels (e.g. blueprint sections for page templates) */}
+      {renderExtra && renderExtra({ form, setForm, selectedId, items })}
 
       {/* Editor grid */}
       <div className="template-editor-grid">

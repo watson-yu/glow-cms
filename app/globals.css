@@ -225,7 +225,7 @@ select.form-input { cursor: pointer; }
   border: 2px dashed #3b82f6;
   border-radius: var(--radius-sm);
   background: #fff;
-  overflow: hidden;
+  overflow: auto;
 }
 .template-preview > div {
   aspect-ratio: 16 / 9;
