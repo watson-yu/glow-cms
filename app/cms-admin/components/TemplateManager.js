@@ -14,6 +14,9 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const [generating, setGenerating] = useState(false);
   const [config, setConfig] = useState({});
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [propagateDialog, setPropagateDialog] = useState(null); // { count, pages }
   const [propagating, setPropagating] = useState(false);
 
@@ -23,9 +26,11 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }, []);
 
   async function loadItems() {
+    setLoading(true);
     const data = await (await fetch(apiPath)).json();
     setItems(data);
     if (data.length && !selectedId) selectItem(data[0]);
+    setLoading(false);
   }
 
   function selectItem(item) {
@@ -49,17 +54,23 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }
 
   async function saveName() {
-    if (selectedId === "new" || !selectedId) return;
-    await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    if (selectedId === "new" || !selectedId || saving) return;
+    setSaving(true); setError(null);
+    const res = await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    setSaving(false);
+    if (!res.ok) { setError("Save failed"); return; }
     setItems(prev => prev.map(i => i.id === selectedId ? { ...i, name: form.name } : i));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   async function save() {
+    if (saving) return;
+    setSaving(true); setError(null);
     const url = selectedId === "new" ? apiPath : `${apiPath}/${selectedId}`;
     const method = selectedId === "new" ? "POST" : "PUT";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    if (!res.ok) { setSaving(false); setError("Save failed"); return; }
     if (selectedId === "new") {
       const { id } = await res.json();
       const data = await (await fetch(apiPath)).json();
@@ -71,9 +82,10 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       // Check usage for section types
       if (showVariables && selectedId !== "new") {
         const usage = await (await fetch(`${apiPath}/${selectedId}/usage`)).json();
-        if (usage.count > 0) { setPropagateDialog(usage); return; }
+        if (usage.count > 0) { setSaving(false); setPropagateDialog(usage); return; }
       }
     }
+    setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -155,7 +167,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 20 }}>
         <label style={{ fontSize: 14, fontWeight: 500, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Name:</label>
         <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className="form-input" placeholder="Name" style={{ maxWidth: 260 }} required />
-        <button type="button" onClick={saveName} className="btn btn-secondary btn-sm">Save</button>
+        <button type="button" onClick={saveName} className="btn btn-secondary btn-sm" disabled={saving}>Save</button>
         {selectedId && selectedId !== "new" && items.length > 1 && (
           <button type="button" onClick={remove} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Delete</button>
         )}
@@ -196,7 +208,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
           ))}
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => setForm({ ...form, variables: [...form.variables, { key: "", label: "", type: "prompt" }] })}>+ Add Variable</button>
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" onClick={save} className="btn btn-primary btn-sm">Save</button>
+            <button type="button" onClick={save} className="btn btn-primary btn-sm" disabled={saving}>Save</button>
             {saved && <span className="toast-saved">✓ Saved</span>}
           </div>
         </div>
@@ -215,8 +227,9 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
           </div>}
           <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
           <div style={{ marginTop: 12, display: "flex", gap: 8, alignItems: "center" }}>
-            <button type="button" onClick={save} className="btn btn-primary">Save</button>
+            <button type="button" onClick={save} className="btn btn-primary" disabled={saving}>Save</button>
             {saved && <span className="toast-saved">✓ Saved</span>}
+            {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
           </div>
         </div>
         <div className="card">

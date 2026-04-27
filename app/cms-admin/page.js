@@ -5,12 +5,17 @@ import Link from "next/link";
 export default function Home() {
   const [pages, setPages] = useState([]);
   const [contentPath, setContentPath] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/pages").then(r => r.json()).then(setPages);
-    fetch("/api/site-config").then(r => r.json()).then(c => {
+    Promise.all([
+      fetch("/api/pages").then(r => r.json()),
+      fetch("/api/site-config").then(r => r.json()),
+    ]).then(([p, c]) => {
+      setPages(p);
       const cp = c.content_path || "";
       setContentPath(!cp || cp === "/" ? "" : cp.startsWith("/") ? cp : `/${cp}`);
+      setLoading(false);
     });
   }, []);
 
@@ -18,9 +23,11 @@ export default function Home() {
 
   async function deletePage(id) {
     if (!confirm("Delete this page?")) return;
-    await fetch(`/api/pages/${id}`, { method: "DELETE" });
-    setPages(prev => prev.filter(p => p.id !== id));
+    const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
+    if (res.ok) setPages(prev => prev.filter(p => p.id !== id));
   }
+
+  if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
   return (
     <>

@@ -124,7 +124,7 @@ export default function AdminShell({ children }) {
     });
   }, []);
 
-  if (dbReady === null || status === "loading") return null;
+  if (dbReady === null || status === "loading") return <p style={{ color: "var(--text-muted)", padding: 24 }}>Loading...</p>;
   if (!dbReady) return <DbSetup />;
   if (authRequired && !session) return <LoginPage logoUrl={site.logo_url} siteTitle={site.site_title} />;
 
