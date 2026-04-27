@@ -1,7 +1,11 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const [rows] = await pool.query(`
     SELECT p.*, h.name as header_name, f.name as footer_name, pt.name as template_name
     FROM pages p
@@ -14,6 +18,9 @@ export async function GET() {
 }
 
 export async function POST(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
   const [result] = await pool.query(
     "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -21,8 +28,8 @@ export async function POST(req) {
   );
   const pageId = result.insertId;
   if (sections?.length) {
-    const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
-    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
+    const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
+    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
   }
   return NextResponse.json({ id: pageId }, { status: 201 });
 }

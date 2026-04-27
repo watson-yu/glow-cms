@@ -1,12 +1,16 @@
 import mysql from "mysql2/promise";
 import { NextResponse } from "next/server";
 import { isDbConfigured, saveDbConfig } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   return NextResponse.json({ configured: isDbConfigured() });
 }
 
 export async function POST(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { host, user, password, database, port } = await req.json();
   const config = { host, user, password, database, port: parseInt(port || "3306") };
 

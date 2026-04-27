@@ -1,7 +1,11 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 export async function GET(req, { params }) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   const [pages] = await pool.query(`
     SELECT p.*, h.name as header_name, h.content as header_content,
@@ -23,6 +27,9 @@ export async function GET(req, { params }) {
 }
 
 export async function PUT(req, { params }) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
   await pool.query(
@@ -31,13 +38,16 @@ export async function PUT(req, { params }) {
   );
   await pool.query("DELETE FROM sections WHERE page_id = ?", [id]);
   if (sections?.length) {
-    const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
-    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
+    const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
+    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
   }
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req, { params }) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { id } = await params;
   await pool.query("DELETE FROM pages WHERE id = ?", [id]);
   return NextResponse.json({ ok: true });

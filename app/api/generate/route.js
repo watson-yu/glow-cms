@@ -1,5 +1,9 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { requireAuth } from "@/lib/auth";
 
 async function getKey(key) {
   const [rows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
@@ -12,7 +16,6 @@ async function getActivePromptRow(scopeKey) {
 }
 
 async function callOpenAI(apiKey, systemPrompt, userPrompt, imageData) {
-  const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey });
   const model = "gpt-4o-mini";
   const content = [{ type: "text", text: userPrompt }];
@@ -28,7 +31,6 @@ async function callOpenAI(apiKey, systemPrompt, userPrompt, imageData) {
 }
 
 async function callClaude(apiKey, systemPrompt, userPrompt, imageData) {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
   const client = new Anthropic({ apiKey });
   const model = "claude-sonnet-4-20250514";
   const content = [];
@@ -44,7 +46,6 @@ async function callClaude(apiKey, systemPrompt, userPrompt, imageData) {
 }
 
 async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
-  const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const client = new GoogleGenerativeAI(apiKey);
   const model = "gemini-2.5-flash";
   const genModel = client.getGenerativeModel({ model });
@@ -55,6 +56,9 @@ async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
 }
 
 export async function POST(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
   if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
 

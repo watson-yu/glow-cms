@@ -1,6 +1,7 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 async function getS3Config() {
   const [rows] = await pool.query("SELECT config_key, config_value FROM system_config WHERE config_key IN ('aws_region','s3_bucket_name','aws_access_key','aws_secret_key')");
@@ -15,6 +16,9 @@ function getClient(cfg) {
 }
 
 export async function POST(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const formData = await req.formData();
   const file = formData.get("file");
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
@@ -36,6 +40,9 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const { url } = await req.json();
   if (!url) return NextResponse.json({ ok: true });
 

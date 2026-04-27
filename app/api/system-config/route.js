@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { saveDbConfig } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireAuth } from "@/lib/auth";
 
 const SECRET_KEYS = ["aws_access_key", "aws_secret_key", "db_password", "google_client_secret", "nextauth_secret", "openai_api_key", "claude_api_key", "gemini_api_key", "ext_db_password"];
 
@@ -10,6 +11,9 @@ function mask(value) {
 }
 
 export async function GET() {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const [rows] = await pool.query("SELECT * FROM system_config");
   const config = {};
   // DB fields always come from live local config, never from system_config
@@ -35,6 +39,9 @@ export async function GET() {
 const DB_KEYS = { db_host: "host", db_port: "port", db_user: "user", db_password: "password", db_name: "database" };
 
 export async function PUT(req) {
+  const authError = await requireAuth();
+  if (authError) return authError;
+
   const data = await req.json();
 
   // Separate DB connection fields from regular config
@@ -44,6 +51,7 @@ export async function PUT(req) {
     if (key in DB_KEYS) {
       dbFields[key] = value;
     } else {
+      if (SECRET_KEYS.includes(key) && !value) continue;
       await pool.query("INSERT INTO system_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value=?", [key, value, value]);
     }
   }
