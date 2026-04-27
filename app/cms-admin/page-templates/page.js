@@ -29,7 +29,7 @@ export default function PageTemplatesPage() {
       sectionsHtml = form.sections.map(s => {
         const st = sectionTypes.find(t => t.id === s.section_type_id);
         return st?.default_content
-          ? substituteVars(st.default_content, config, { stripUnresolved: true })
+          ? substituteVars(st.default_content, config)
           : `<div style="border:2px dashed var(--border);padding:16px;text-align:center;color:var(--text-muted);border-radius:8px;margin:8px 0">[${st?.name || 'Section'}]</div>`;
       }).join("\n");
     }
