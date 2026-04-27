@@ -19,7 +19,7 @@ export default function Home() {
   async function deletePage(id) {
     if (!confirm("Delete this page?")) return;
     await fetch(`/api/pages/${id}`, { method: "DELETE" });
-    setPages(pages.filter(p => p.id !== id));
+    setPages(prev => prev.filter(p => p.id !== id));
   }
 
   return (

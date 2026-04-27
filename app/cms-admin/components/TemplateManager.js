@@ -51,7 +51,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   async function saveName() {
     if (selectedId === "new" || !selectedId) return;
     await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    setItems(items.map(i => i.id === selectedId ? { ...i, name: form.name } : i));
+    setItems(prev => prev.map(i => i.id === selectedId ? { ...i, name: form.name } : i));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -67,7 +67,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       const created = data.find(i => i.id === id);
       if (created) selectItem(created);
     } else {
-      setItems(items.map(i => i.id === selectedId ? { ...i, ...form } : i));
+      setItems(prev => prev.map(i => i.id === selectedId ? { ...i, ...form } : i));
       // Check usage for section types
       if (showVariables && selectedId !== "new") {
         const usage = await (await fetch(`${apiPath}/${selectedId}/usage`)).json();

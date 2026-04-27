@@ -7,7 +7,18 @@ export default function PromptEditor({ scopeType, scopeKey, label }) {
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
 
-  useEffect(() => { load(); }, [scopeKey]);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`/api/prompts?scope_key=${encodeURIComponent(scopeKey)}`, { signal: controller.signal })
+      .then(r => r.json())
+      .then(data => {
+        setActive(data.active);
+        setVersions(data.versions || []);
+        setDraft(data.active?.content || "");
+      })
+      .catch(e => { if (e.name !== "AbortError") console.error(e); });
+    return () => controller.abort();
+  }, [scopeKey]);
 
   async function load() {
     const res = await fetch(`/api/prompts?scope_key=${encodeURIComponent(scopeKey)}`);
