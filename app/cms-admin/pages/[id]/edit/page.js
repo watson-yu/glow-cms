@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { substituteVars } from "@/lib/template";
 
 export default function EditPage() {
   const { id } = useParams();
@@ -40,6 +41,7 @@ export default function EditPage() {
       sections: (d.sections || []).map(s => ({
         ...s,
         variables: typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}),
+        variable_origins: typeof s.variable_origins === "string" ? JSON.parse(s.variable_origins || "{}") : (s.variable_origins || {}),
         type_variables: typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []),
       }))
     }));
@@ -47,15 +49,89 @@ export default function EditPage() {
 
   const set = (f) => (e) => setForm({ ...form, [f]: e.target.value });
 
+  const autoFilled = useRef(false);
+  useEffect(() => {
+    if (autoFilled.current || !form.sections.length || !categories.length) return;
+    autoFilled.current = true;
+    const allCats = categories.flatMap(p => [p, ...p.children]);
+    const cat = allCats.find(c => c.id === Number(form.category_id));
+    const ctx = { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
+
+    let updated = false;
+    const newSections = form.sections.map(s => {
+      if (!s.type_variables?.length) return s;
+      const vars = { ...(s.variables || {}) };
+      const origins = { ...(s.variable_origins || {}) };
+      s.type_variables.forEach(v => {
+        if (!vars[v.key] && (v.type || "prompt") === "fixed" && v.label && origins[v.key] !== "manual") {
+          vars[v.key] = substituteVars(v.label, ctx);
+          origins[v.key] = "ai_generated";
+          updated = true;
+        }
+      });
+      return { ...s, variables: vars, variable_origins: origins };
+    });
+    if (updated) setForm(prev => ({ ...prev, sections: newSections }));
+  }, [form.sections, categories]);
+
+  const [generating, setGenerating] = useState({});
+
   function addSection(typeId) {
     const type = sectionTypes.find(t => t.id === Number(typeId));
     if (!type) return;
     const typVars = typeof type.variables === "string" ? JSON.parse(type.variables || "[]") : (type.variables || []);
-    setForm({ ...form, sections: [...form.sections, { section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {} }] });
+    const hasPrompts = typVars.some(v => (v.type || "prompt") === "prompt" && v.label);
+    const newIdx = form.sections.length;
+    const newSection = { section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {}, variable_origins: {} };
+    setForm(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
+    if (hasPrompts) autoGenerate(newIdx, newSection);
   }
 
   function removeSection(i) {
     setForm({ ...form, sections: form.sections.filter((_, j) => j !== i) });
+  }
+
+  function getPageContext() {
+    const allCats = categories.flatMap(p => [p, ...p.children]);
+    const cat = allCats.find(c => c.id === Number(form.category_id));
+    return { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
+  }
+
+  async function autoGenerate(sectionIdx, sectionData) {
+    const s = sectionData || form.sections[sectionIdx];
+    if (!s?.type_variables?.length) return;
+    const ctx = getPageContext();
+    const origins = s.variable_origins || {};
+    const toGenerate = s.type_variables.filter(v =>
+      (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual"
+    );
+    if (!toGenerate.length) return;
+
+    setGenerating(g => ({ ...g, [sectionIdx]: true }));
+    const prompt = toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n");
+    const res = await fetch("/api/generate", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: "gemini",
+        prompt: `Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${prompt}`,
+        currentHtml: "",
+        objectType: null, objectKey: null,
+      }),
+    });
+    const data = await res.json();
+    setGenerating(g => ({ ...g, [sectionIdx]: false }));
+    if (data.error) return;
+    try {
+      const clean = data.html.replace(/```json?\n?|\n?```/g, "").trim();
+      const values = JSON.parse(clean);
+      setForm(prev => {
+        const sec = [...prev.sections];
+        const newOrigins = { ...sec[sectionIdx].variable_origins };
+        for (const k of Object.keys(values)) newOrigins[k] = "ai_generated";
+        sec[sectionIdx] = { ...sec[sectionIdx], variables: { ...sec[sectionIdx].variables, ...values }, variable_origins: newOrigins };
+        return { ...prev, sections: sec };
+      });
+    } catch (e) { /* ignore parse errors */ }
   }
 
   async function save(e) {
@@ -122,17 +198,26 @@ export default function EditPage() {
                 <strong>🧩 {s.type_name || `Section ${i + 1}`}</strong>
                 <button type="button" onClick={() => removeSection(i)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Remove</button>
               </div>
-              <textarea value={s.content || ""} onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], content: e.target.value }; setForm({ ...form, sections: sec }); }} rows={5} className="form-input" />
               {s.type_variables?.length > 0 && (
                 <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
                   <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, fontWeight: 500 }}>Variables</div>
-                  {s.type_variables.map(v => (
-                    <div key={v.key} className="form-field" style={{ marginBottom: 6 }}>
-                      <label style={{ fontSize: 13 }}>{v.label || v.key}</label>
-                      <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""}
-                        onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value } }; setForm({ ...form, sections: sec }); }} />
+                  {s.type_variables.map(v => {
+                    const allCats = categories.flatMap(p => [p, ...p.children]);
+                    const cat = allCats.find(c => c.id === Number(form.category_id));
+                    const ctx = { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
+                    const origin = (s.variable_origins || {})[v.key];
+                    const badge = origin === "manual" ? "✏️" : origin === "ai_generated" ? "🤖" : null;
+                    return (
+                    <div key={v.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center", gap: 8, paddingBlock: 6, borderBottom: "1px solid var(--border)" }}>
+                      <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={origin} style={{ fontSize: 11 }}>{badge}</span>}</label>
+                      <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""} placeholder={v.type === "fixed" && v.label ? substituteVars(v.label, ctx) : ""}
+                        onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: "manual" } }; setForm({ ...form, sections: sec }); }} />
                     </div>
-                  ))}
+                    );
+                  })}
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => autoGenerate(i)} disabled={generating[i]}>
+                    {generating[i] ? "⏳ Generating…" : "🤖 Re-generate"}
+                  </button>
                 </div>
               )}
             </div>
