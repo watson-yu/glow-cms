@@ -227,10 +227,6 @@ select.form-input { cursor: pointer; }
   background: #fff;
   overflow: auto;
 }
-.template-preview > div {
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-}
 .template-preview [style*="min-height: 100vh"] {
   min-height: 100% !important;
   height: 100%;
