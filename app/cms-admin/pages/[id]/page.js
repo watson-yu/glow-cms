@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { substituteVars } from "@/lib/template";
+import SafeHtml from "@/app/components/SafeHtml";
 
 export default function ViewPage() {
   const { id } = useParams();
@@ -17,7 +18,10 @@ export default function ViewPage() {
 
   if (!page) return <p style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
-  const sub = (html) => substituteVars(html, config);
+  const sub = (html, vars) => {
+    let out = vars ? substituteVars(html, vars) : html;
+    return substituteVars(out, config, { stripUnresolved: true });
+  };
 
   return (
     <>
@@ -37,21 +41,31 @@ export default function ViewPage() {
       {page.header_content && (
         <div className="card">
           <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Header</div>
-          <div dangerouslySetInnerHTML={{ __html: sub(page.header_content) }} />
+          <SafeHtml html={sub(page.header_content)} />
         </div>
       )}
 
-      {page.sections?.map((s, i) => (
-        <div key={i} className="card">
-          <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>🧩 {s.type_name}</div>
-          <div dangerouslySetInnerHTML={{ __html: sub(s.content) }} />
-        </div>
-      ))}
+      {page.sections?.map((s, i) => {
+        const typeVars = typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []);
+        const pageVars = typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {});
+        const defaults = {};
+        const ctx = { ...config, title: page.title, slug: page.slug };
+        for (const v of typeVars) {
+          if (v.type === "fixed" && v.label) defaults[v.key] = substituteVars(v.label, ctx);
+        }
+        const vars = { ...defaults, ...pageVars };
+        return (
+          <div key={i} className="card">
+            <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>🧩 {s.type_name}</div>
+            <SafeHtml html={sub(s.content, vars)} />
+          </div>
+        );
+      })}
 
       {page.footer_content && (
         <div className="card">
           <div style={{ fontSize: 11, fontWeight: 600, textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Footer</div>
-          <div dangerouslySetInnerHTML={{ __html: sub(page.footer_content) }} />
+          <SafeHtml html={sub(page.footer_content)} />
         </div>
       )}
     </>

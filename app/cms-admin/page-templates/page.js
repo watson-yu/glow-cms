@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import TemplateManager from "@/app/cms-admin/components/TemplateManager";
 import { substituteVars } from "@/lib/template";
+import SafeHtml from "@/app/components/SafeHtml";
 
 export default function PageTemplatesPage() {
   const [headerHtml, setHeaderHtml] = useState("");
@@ -22,9 +23,9 @@ export default function PageTemplatesPage() {
       : '<span style="color:var(--text-muted)">No content yet</span>';
     return (
       <>
-        {header && <div dangerouslySetInnerHTML={{ __html: header }} />}
-        <div dangerouslySetInnerHTML={{ __html: body }} />
-        {footer && <div dangerouslySetInnerHTML={{ __html: footer }} />}
+        {header && <SafeHtml html={header} />}
+        <SafeHtml html={body} />
+        {footer && <SafeHtml html={footer} />}
       </>
     );
   }
