@@ -147,8 +147,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         <div className="card-title">Preview</div>
         <div className="template-preview">
           {renderPreview
-            ? renderPreview(substituteVars(form[contentField], config), { form, setForm })
-            : <div dangerouslySetInnerHTML={{ __html: substituteVars(form[contentField], config) || '<span style="color:var(--text-muted)">No content yet</span>' }} />
+            ? renderPreview(substituteVars(form[contentField], config, { stripUnresolved: true }), { form, setForm })
+            : <div dangerouslySetInnerHTML={{ __html: substituteVars(form[contentField], config, { stripUnresolved: true }) || '<span style="color:var(--text-muted)">No content yet</span>' }} />
           }
         </div>
       </div>

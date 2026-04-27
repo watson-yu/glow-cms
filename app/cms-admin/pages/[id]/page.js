@@ -17,7 +17,7 @@ export default function ViewPage() {
 
   if (!page) return <p style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
-  const sub = (html) => substituteVars(html, config);
+  const sub = (html) => substituteVars(html, config, { stripUnresolved: true });
 
   return (
     <>
