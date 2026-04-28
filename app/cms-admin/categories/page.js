@@ -113,15 +113,25 @@ export default function CategoriesPage() {
     loadPages();
     if (createdIds.length) {
       setGenStatus({ total: createdIds.length, done: 0, failed: 0 });
-      let done = 0, failed = 0;
+      // Fire off generation for all pages
       for (const pid of createdIds) {
-        try {
-          const r = await fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
-          if (r.ok) done++; else failed++;
-        } catch { failed++; }
-        setGenStatus({ total: createdIds.length, done: done + failed, failed });
+        fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
       }
-      setTimeout(() => setGenStatus(null), failed ? 8000 : 3000);
+      // Poll job status
+      const pollInterval = setInterval(async () => {
+        try {
+          const r = await fetch(`/api/generation-jobs?page_ids=${createdIds.join(",")}`);
+          const jobs = await r.json();
+          const done = jobs.filter(j => j.status === "completed").length;
+          const failed = jobs.filter(j => j.status === "failed").length;
+          const running = jobs.filter(j => j.status === "running" || j.status === "pending").length;
+          setGenStatus({ total: createdIds.length, done: done + failed, failed });
+          if (!running && jobs.length === createdIds.length) {
+            clearInterval(pollInterval);
+            setTimeout(() => setGenStatus(null), failed ? 8000 : 3000);
+          }
+        } catch { /* ignore poll errors */ }
+      }, 2000);
     }
   }
 

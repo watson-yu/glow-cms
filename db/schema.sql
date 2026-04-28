@@ -135,6 +135,18 @@ CREATE TABLE IF NOT EXISTS generation_logs (
   INDEX idx_generation_logs_object_key (object_key)
 );
 
+CREATE TABLE IF NOT EXISTS generation_jobs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  page_id INT NOT NULL,
+  status ENUM('pending','running','completed','failed') DEFAULT 'pending',
+  sections_total INT DEFAULT 0,
+  sections_done INT DEFAULT 0,
+  error TEXT DEFAULT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  completed_at TIMESTAMP DEFAULT NULL,
+  CONSTRAINT fk_gj_page FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+);
+
 INSERT INTO page_templates (id, name, content)
 VALUES (1, 'Default', '<div class="page-content">{{content}}</div>')
 ON DUPLICATE KEY UPDATE

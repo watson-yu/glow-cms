@@ -31,9 +31,24 @@ export async function POST(req, { params }) {
       [id]
     );
 
+    // Count sections that need generation
+    const sectionsToGen = sections.filter(sec => {
+      const tv = typeof sec.type_variables === "string" ? JSON.parse(sec.type_variables || "[]") : (sec.type_variables || []);
+      const origins = typeof sec.variable_origins === "string" ? JSON.parse(sec.variable_origins || "{}") : (sec.variable_origins || {});
+      return tv.some(v => (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual");
+    });
+
+    // Create job record
+    const [jobResult] = await pool.query(
+      "INSERT INTO generation_jobs (page_id, status, sections_total) VALUES (?, 'running', ?)",
+      [id, sectionsToGen.length]
+    );
+    const jobId = jobResult.insertId;
+
     const client = new GoogleGenerativeAI(apiKey);
     const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
-    let generated = 0;
+    let done = 0;
+    let lastError = null;
 
     for (const sec of sections) {
       const typeVars = (() => { try { return typeof sec.type_variables === "string" ? JSON.parse(sec.type_variables || "[]") : (sec.type_variables || []); } catch { return []; } })();
@@ -53,11 +68,21 @@ export async function POST(req, { params }) {
           origins[k] = "ai_generated";
         }
         await pool.query("UPDATE sections SET variables = ?, variable_origins = ? WHERE id = ?", [JSON.stringify(vars), JSON.stringify(origins), sec.id]);
-        generated++;
-      } catch { /* skip on LLM/parse errors */ }
+        done++;
+        await pool.query("UPDATE generation_jobs SET sections_done = ? WHERE id = ?", [done, jobId]);
+      } catch (e) {
+        lastError = e.message || "Generation failed";
+      }
     }
 
-    return NextResponse.json({ ok: true, generated });
+    // Finalize job
+    const finalStatus = done === sectionsToGen.length ? "completed" : (done > 0 ? "completed" : "failed");
+    await pool.query(
+      "UPDATE generation_jobs SET status = ?, sections_done = ?, error = ?, completed_at = NOW() WHERE id = ?",
+      [finalStatus, done, lastError, jobId]
+    );
+
+    return NextResponse.json({ ok: true, jobId, generated: done });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
