@@ -9,6 +9,7 @@ export default function EditPage() {
   const router = useRouter();
   const isNew = id === "new";
   const [form, setForm] = useState({ title: "", slug: "", header_id: "", footer_id: "", page_template_id: "", status: "draft", category_id: "", sections: [] });
+  const [saving, setSaving] = useState(false);
   const [headers, setHeaders] = useState([]);
   const [footers, setFooters] = useState([]);
   const [pageTemplates, setPageTemplates] = useState([]);
@@ -136,9 +137,13 @@ export default function EditPage() {
 
   async function save(e) {
     e.preventDefault();
-    const url = isNew ? "/api/pages" : `/api/pages/${id}`;
-    await fetch(url, { method: isNew ? "POST" : "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    router.push("/cms-admin");
+    setSaving(true);
+    try {
+      const url = isNew ? "/api/pages" : `/api/pages/${id}`;
+      const res = await fetch(url, { method: isNew ? "POST" : "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Save failed"); setSaving(false); return; }
+      router.push("/cms-admin");
+    } catch { alert("Save failed"); setSaving(false); }
   }
 
   return (
@@ -238,7 +243,7 @@ export default function EditPage() {
           </select>
         </div>
 
-        <button type="submit" className="btn btn-primary">Save Page</button>
+        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Save Page"}</button>
       </form>
     </>
   );
