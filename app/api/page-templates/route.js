@@ -3,22 +3,24 @@ import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validString, err } from "@/lib/validate";
 
-export async function GET() {
+export async function GET(req) {
   const authError = await requireAuth();
   if (authError) return authError;
   try {
     const [rows] = await pool.query("SELECT * FROM page_templates ORDER BY id");
-    let sections = [];
-    try {
-      [sections] = await pool.query("SELECT * FROM page_template_sections ORDER BY page_template_id, sort_order");
-    } catch {
-      // table may not exist yet (migration pending)
+    const include = new URL(req.url).searchParams.get("include");
+    if (include === "sections") {
+      let sections = [];
+      try {
+        [sections] = await pool.query("SELECT * FROM page_template_sections ORDER BY page_template_id, sort_order");
+      } catch { }
+      const sectionsByTemplate = {};
+      for (const s of sections) {
+        (sectionsByTemplate[s.page_template_id] ||= []).push(s);
+      }
+      return NextResponse.json(rows.map(r => ({ ...r, sections: sectionsByTemplate[r.id] || [] })));
     }
-    const sectionsByTemplate = {};
-    for (const s of sections) {
-      (sectionsByTemplate[s.page_template_id] ||= []).push(s);
-    }
-    return NextResponse.json(rows.map(r => ({ ...r, sections: sectionsByTemplate[r.id] || [] })));
+    return NextResponse.json(rows);
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

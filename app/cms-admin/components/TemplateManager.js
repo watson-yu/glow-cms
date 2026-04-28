@@ -4,7 +4,7 @@ import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 import SafeHtml from "@/app/components/SafeHtml";
 
-export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor }) {
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor, listParams = "" }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState({ name: "", [contentField]: "", variables: [] });
@@ -27,7 +27,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   async function loadItems() {
     setLoading(true);
-    const data = await (await fetch(apiPath)).json();
+    const data = await (await fetch(apiPath + listParams)).json();
     setItems(data);
     if (data.length && !selectedId) selectItem(data[0]);
     setLoading(false);
@@ -75,7 +75,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     if (!res.ok) { setSaving(false); setError("Save failed"); return; }
     if (selectedId === "new") {
       const { id } = await res.json();
-      const data = await (await fetch(apiPath)).json();
+      const data = await (await fetch(apiPath + listParams)).json();
       setItems(data);
       const created = data.find(i => i.id === id);
       if (created) selectItem(created);
@@ -113,7 +113,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   async function remove() {
     if (!confirm(`Delete "${form.name}"?`)) return;
     await fetch(`${apiPath}/${selectedId}`, { method: "DELETE" });
-    const data = await (await fetch(apiPath)).json();
+    const data = await (await fetch(apiPath + listParams)).json();
     setItems(data);
     if (data.length) selectItem(data[0]);
     else { setSelectedId(null); setForm({ name: "", [contentField]: "" }); }
