@@ -17,7 +17,7 @@ export default function CategoriesPage() {
   const [syncResult, setSyncResult] = useState(null);
   const [collapsed, setCollapsed] = useState({});
   const [createFor, setCreateFor] = useState(null); // category to create page for
-  const [pageForm, setPageForm] = useState({ header_id: "", footer_id: "", page_template_id: "", status: "draft" });
+  const [pageForm, setPageForm] = useState({ page_template_id: "", page_template_id_l1: "", page_template_id_l2: "", header_id: "", footer_id: "", status: "draft" });
   const [options, setOptions] = useState({ headers: [], footers: [], pageTemplates: [] });
   const [pageMap, setPageMap] = useState({}); // category_id -> page
 
@@ -79,16 +79,21 @@ export default function CategoriesPage() {
     const cats = all.filter(c => selected.has(c.id) && !pageMap[c.id]);
     if (!cats.length) return;
     setCreateFor(cats);
-    setPageForm({ header_id: "", footer_id: "", page_template_id: options.pageTemplates[0]?.id || "", status: "draft" });
+    const defaultTpl = options.pageTemplates[0]?.id || "";
+    setPageForm({ page_template_id: defaultTpl, page_template_id_l1: defaultTpl, page_template_id_l2: defaultTpl, header_id: "", footer_id: "", status: "draft" });
   }
 
   async function submitCreatePage(e) {
     e.preventDefault();
     const cats = Array.isArray(createFor) ? createFor : [createFor];
+    const hasL1 = cats.some(c => !c.parent_id);
+    const hasL2 = cats.some(c => c.parent_id);
+    const isMixed = hasL1 && hasL2;
     for (const cat of cats) {
+      const tplId = isMixed ? (cat.parent_id ? pageForm.page_template_id_l2 : pageForm.page_template_id_l1) : pageForm.page_template_id;
       await fetch("/api/pages", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, ...pageForm }),
+        body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: pageForm.status }),
       });
     }
     setCreateFor(null);
@@ -189,6 +194,28 @@ export default function CategoriesPage() {
           <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
             <input type="checkbox" onChange={toggleSelectAll} checked={tree.length > 0 && selected.size === tree.flatMap(p => [p, ...p.children]).length} /> Select All
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
+            <input type="checkbox" onChange={() => {
+              const l1Ids = tree.map(p => p.id);
+              setSelected(prev => {
+                const allOn = l1Ids.every(id => prev.has(id));
+                const next = new Set(prev);
+                l1Ids.forEach(id => allOn ? next.delete(id) : next.add(id));
+                return next;
+              });
+            }} checked={tree.length > 0 && tree.every(p => selected.has(p.id))} /> L1
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "var(--text-muted)", cursor: "pointer" }}>
+            <input type="checkbox" onChange={() => {
+              const l2Ids = tree.flatMap(p => p.children.map(c => c.id));
+              setSelected(prev => {
+                const allOn = l2Ids.length > 0 && l2Ids.every(id => prev.has(id));
+                const next = new Set(prev);
+                l2Ids.forEach(id => allOn ? next.delete(id) : next.add(id));
+                return next;
+              });
+            }} checked={tree.flatMap(p => p.children).length > 0 && tree.flatMap(p => p.children).every(c => selected.has(c.id))} /> L2
+          </label>
           <button className="btn btn-primary btn-sm" onClick={openBatchCreate} disabled={!selected.size || ![...selected].some(id => !pageMap[id])}>+ Create Pages ({[...selected].filter(id => !pageMap[id]).length})</button>
         </div>
       </div>
@@ -288,42 +315,75 @@ export default function CategoriesPage() {
                   {createFor.map(c => <div key={c.id}>{c.name} <span style={{ color: "var(--text-muted)" }}>/{c.slug}</span></div>)}
                 </div>
               )}
-              <div className="form-field">
-                <label>Page Template</label>
-                <select className="form-input" value={pageForm.page_template_id} onChange={e => setPageForm({ ...pageForm, page_template_id: e.target.value, header_id: "", footer_id: "" })}>
-                  {options.pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
               {(() => {
-                const tpl = options.pageTemplates.find(t => String(t.id) === String(pageForm.page_template_id));
-                const isBlueprint = tpl && (tpl.header_id || tpl.footer_id || tpl.sections?.length);
-                if (isBlueprint) {
+                const cats = Array.isArray(createFor) ? createFor : [createFor];
+                const l1 = cats.filter(c => !c.parent_id);
+                const l2 = cats.filter(c => c.parent_id);
+                const isMixed = l1.length > 0 && l2.length > 0;
+
+                function BlueprintSummary({ tplId }) {
+                  const tpl = options.pageTemplates.find(t => String(t.id) === String(tplId));
+                  if (!tpl || (!tpl.header_id && !tpl.footer_id && !tpl.sections?.length)) return null;
                   const hName = options.headers.find(h => h.id === tpl.header_id)?.name;
                   const fName = options.footers.find(f => f.id === tpl.footer_id)?.name;
                   const sNames = (tpl.sections || []).map(s => (options.sectionTypes || []).find(st => st.id === s.section_type_id)?.name || `#${s.section_type_id}`);
                   return (
-                    <div style={{ fontSize: 13, color: "var(--text-muted)", background: "var(--bg-muted, #f5f5f5)", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
-                      <strong style={{ color: "var(--text)" }}>Blueprint:</strong>{" "}
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", background: "var(--bg-muted, #f5f5f5)", borderRadius: 6, padding: "6px 10px", marginTop: 4 }}>
                       {[hName && `Header: ${hName}`, fName && `Footer: ${fName}`, sNames.length && `${sNames.length} section${sNames.length > 1 ? "s" : ""} (${sNames.join(", ")})`].filter(Boolean).join(" · ")}
                     </div>
                   );
                 }
+
+                if (isMixed) {
+                  return (
+                    <>
+                      <div className="form-field">
+                        <label>Template for L1 categories ({l1.length})</label>
+                        <select className="form-input" value={pageForm.page_template_id_l1} onChange={e => setPageForm({ ...pageForm, page_template_id_l1: e.target.value })}>
+                          {options.pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <BlueprintSummary tplId={pageForm.page_template_id_l1} />
+                      </div>
+                      <div className="form-field">
+                        <label>Template for L2 categories ({l2.length})</label>
+                        <select className="form-input" value={pageForm.page_template_id_l2} onChange={e => setPageForm({ ...pageForm, page_template_id_l2: e.target.value })}>
+                          {options.pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <BlueprintSummary tplId={pageForm.page_template_id_l2} />
+                      </div>
+                    </>
+                  );
+                }
+
+                const tpl = options.pageTemplates.find(t => String(t.id) === String(pageForm.page_template_id));
+                const isBlueprint = tpl && (tpl.header_id || tpl.footer_id || tpl.sections?.length);
                 return (
                   <>
                     <div className="form-field">
-                      <label>Header</label>
-                      <select className="form-input" value={pageForm.header_id} onChange={e => setPageForm({ ...pageForm, header_id: e.target.value })}>
-                        <option value="">— None —</option>
-                        {options.headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      <label>Page Template</label>
+                      <select className="form-input" value={pageForm.page_template_id} onChange={e => setPageForm({ ...pageForm, page_template_id: e.target.value, header_id: "", footer_id: "" })}>
+                        {options.pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                       </select>
+                      <BlueprintSummary tplId={pageForm.page_template_id} />
                     </div>
-                    <div className="form-field">
-                      <label>Footer</label>
-                      <select className="form-input" value={pageForm.footer_id} onChange={e => setPageForm({ ...pageForm, footer_id: e.target.value })}>
-                        <option value="">— None —</option>
-                        {options.footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                      </select>
-                    </div>
+                    {!isBlueprint && (
+                      <>
+                        <div className="form-field">
+                          <label>Header</label>
+                          <select className="form-input" value={pageForm.header_id} onChange={e => setPageForm({ ...pageForm, header_id: e.target.value })}>
+                            <option value="">— None —</option>
+                            {options.headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="form-field">
+                          <label>Footer</label>
+                          <select className="form-input" value={pageForm.footer_id} onChange={e => setPageForm({ ...pageForm, footer_id: e.target.value })}>
+                            <option value="">— None —</option>
+                            {options.footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                          </select>
+                        </div>
+                      </>
+                    )}
                   </>
                 );
               })()}
