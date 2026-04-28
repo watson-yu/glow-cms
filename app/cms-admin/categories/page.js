@@ -99,7 +99,7 @@ export default function CategoriesPage() {
       try {
         const res = await fetch("/api/pages", {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: pageForm.status }),
+          body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: "generating" }),
         });
         const data = await res.json();
         if (data.id) createdIds.push(data.id);
