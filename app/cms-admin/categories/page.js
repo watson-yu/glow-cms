@@ -289,24 +289,33 @@ export default function CategoriesPage() {
               )}
               <div className="form-field">
                 <label>Page Template</label>
-                <select className="form-input" value={pageForm.page_template_id} onChange={e => setPageForm({ ...pageForm, page_template_id: e.target.value })}>
+                <select className="form-input" value={pageForm.page_template_id} onChange={e => setPageForm({ ...pageForm, page_template_id: e.target.value, header_id: "", footer_id: "" })}>
                   {options.pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
-              <div className="form-field">
-                <label>Header</label>
-                <select className="form-input" value={pageForm.header_id} onChange={e => setPageForm({ ...pageForm, header_id: e.target.value })}>
-                  <option value="">— None —</option>
-                  {options.headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-                </select>
-              </div>
-              <div className="form-field">
-                <label>Footer</label>
-                <select className="form-input" value={pageForm.footer_id} onChange={e => setPageForm({ ...pageForm, footer_id: e.target.value })}>
-                  <option value="">— None —</option>
-                  {options.footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
-              </div>
+              {(() => {
+                const tpl = options.pageTemplates.find(t => String(t.id) === String(pageForm.page_template_id));
+                const isBlueprint = tpl && (tpl.header_id || tpl.footer_id || tpl.sections?.length);
+                if (isBlueprint) return null;
+                return (
+                  <>
+                    <div className="form-field">
+                      <label>Header</label>
+                      <select className="form-input" value={pageForm.header_id} onChange={e => setPageForm({ ...pageForm, header_id: e.target.value })}>
+                        <option value="">— None —</option>
+                        {options.headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>Footer</label>
+                      <select className="form-input" value={pageForm.footer_id} onChange={e => setPageForm({ ...pageForm, footer_id: e.target.value })}>
+                        <option value="">— None —</option>
+                        {options.footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                      </select>
+                    </div>
+                  </>
+                );
+              })()}
               <div className="form-field">
                 <label>Status</label>
                 <select className="form-input" value={pageForm.status} onChange={e => setPageForm({ ...pageForm, status: e.target.value })}>
