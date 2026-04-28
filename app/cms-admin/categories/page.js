@@ -21,6 +21,7 @@ export default function CategoriesPage() {
   const [options, setOptions] = useState({ headers: [], footers: [], pageTemplates: [] });
   const [pageMap, setPageMap] = useState({}); // category_id -> page
   const [creating, setCreating] = useState(false);
+  const [genStatus, setGenStatus] = useState(null); // { total, done, failed }
 
   const load = () => fetch("/api/categories").then(r => r.json()).then(setTree);
   const loadPages = () => fetch("/api/pages").then(r => r.json()).then(pages => {
@@ -105,9 +106,17 @@ export default function CategoriesPage() {
     setCreateFor(null);
     setSelected(new Set());
     loadPages();
-    // Fire-and-forget: generate prompt variables for created pages
-    for (const pid of createdIds) {
-      fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
+    if (createdIds.length) {
+      setGenStatus({ total: createdIds.length, done: 0, failed: 0 });
+      let done = 0, failed = 0;
+      for (const pid of createdIds) {
+        try {
+          const r = await fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
+          if (r.ok) done++; else failed++;
+        } catch { failed++; }
+        setGenStatus({ total: createdIds.length, done: done + failed, failed });
+      }
+      setTimeout(() => setGenStatus(null), failed ? 8000 : 3000);
     }
   }
 
@@ -229,6 +238,16 @@ export default function CategoriesPage() {
           <button className="btn btn-primary btn-sm" onClick={openBatchCreate} disabled={!selected.size || ![...selected].some(id => !pageMap[id])}>+ Create Pages ({[...selected].filter(id => !pageMap[id]).length})</button>
         </div>
       </div>
+
+      {genStatus && (
+        <div style={{ padding: "8px 16px", marginBottom: 8, borderRadius: 6, fontSize: 13, background: genStatus.failed ? "var(--danger-bg, #fef2f2)" : "var(--bg-muted, #f5f5f5)", color: genStatus.failed ? "var(--danger)" : "var(--text-muted)" }}>
+          {genStatus.done < genStatus.total
+            ? `Generating variables… ${genStatus.done}/${genStatus.total}`
+            : genStatus.failed
+              ? `Generated ${genStatus.total - genStatus.failed}/${genStatus.total} — ${genStatus.failed} failed (check pages manually)`
+              : `✓ Generated variables for ${genStatus.total} page${genStatus.total > 1 ? "s" : ""}`}
+        </div>
+      )}
 
       {adding && !adding.parent_id && (
         <div className="card" style={{ marginBottom: 12 }}>
