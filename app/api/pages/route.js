@@ -76,7 +76,7 @@ export async function POST(req) {
       await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
     } else if (blueprintSections) {
       const values = blueprintSections.map(s => {
-        const typeVars = (() => { try { return JSON.parse(s.type_variables || "[]"); } catch { return []; } })();
+        const typeVars = (() => { try { return typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []); } catch { return []; } })();
         const vars = {};
         for (const v of typeVars) {
           if (v.type === "fixed" && v.label) vars[v.key] = substituteVars(v.label, varCtx);

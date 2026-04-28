@@ -36,9 +36,9 @@ export async function POST(req, { params }) {
     let generated = 0;
 
     for (const sec of sections) {
-      const typeVars = (() => { try { return JSON.parse(sec.type_variables || "[]"); } catch { return []; } })();
-      const vars = (() => { try { return JSON.parse(sec.variables || "{}"); } catch { return {}; } })();
-      const origins = (() => { try { return JSON.parse(sec.variable_origins || "{}"); } catch { return {}; } })();
+      const typeVars = (() => { try { return typeof sec.type_variables === "string" ? JSON.parse(sec.type_variables || "[]") : (sec.type_variables || []); } catch { return []; } })();
+      const vars = (() => { try { return typeof sec.variables === "string" ? JSON.parse(sec.variables || "{}") : (sec.variables || {}); } catch { return {}; } })();
+      const origins = (() => { try { return typeof sec.variable_origins === "string" ? JSON.parse(sec.variable_origins || "{}") : (sec.variable_origins || {}); } catch { return {}; } })();
 
       const toGenerate = typeVars.filter(v => (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual");
       if (!toGenerate.length) continue;
