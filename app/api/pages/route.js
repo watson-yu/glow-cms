@@ -32,8 +32,8 @@ export async function POST(req) {
     if (status && !validStatus(status)) return err("status must be draft or published");
 
     // Blueprint expansion: inherit header/footer and sections from template
-    let effectiveHeaderId = header_id || null;
-    let effectiveFooterId = footer_id || null;
+    let effectiveHeaderId = header_id ? Number(header_id) : null;
+    let effectiveFooterId = footer_id ? Number(footer_id) : null;
     let blueprintSections = null;
 
     if (page_template_id && !sections?.length) {
