@@ -16,9 +16,10 @@ export default function EditPage() {
   const [sectionTypes, setSectionTypes] = useState([]);
   const [categories, setCategories] = useState([]);
   const [contentPath, setContentPath] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
+    const loadOptions = Promise.all([
       fetch("/api/headers").then(r => r.json()),
       fetch("/api/footers").then(r => r.json()),
       fetch("/api/page-templates").then(r => r.json()),
@@ -26,26 +27,26 @@ export default function EditPage() {
       fetch("/api/site-config").then(r => r.json()),
       fetch("/api/categories").then(r => r.json()),
     ]).then(([h, f, pt, st, c, cats]) => {
-      setHeaders(h);
-      setFooters(f);
-      setPageTemplates(pt);
-      setSectionTypes(st);
-      setCategories(cats);
+      setHeaders(h); setFooters(f); setPageTemplates(pt); setSectionTypes(st); setCategories(cats);
       const cp = c.content_path || "";
       setContentPath(!cp || cp === "/" ? "" : cp.startsWith("/") ? cp : `/${cp}`);
       if (isNew) {
         setForm(prev => ({ ...prev, header_id: h[0]?.id || "", footer_id: f[0]?.id || "", page_template_id: pt[0]?.id || "" }));
+        setLoading(false);
       }
     });
-    if (!isNew) fetch(`/api/pages/${id}`).then(r => r.json()).then(d => setForm({
-      ...d, header_id: d.header_id || "", footer_id: d.footer_id || "", page_template_id: d.page_template_id || "", category_id: d.category_id || "",
-      sections: (d.sections || []).map(s => ({
-        ...s,
-        variables: typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}),
-        variable_origins: typeof s.variable_origins === "string" ? JSON.parse(s.variable_origins || "{}") : (s.variable_origins || {}),
-        type_variables: typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []),
-      }))
-    }));
+    if (!isNew) fetch(`/api/pages/${id}`).then(r => r.json()).then(d => {
+      setForm({
+        ...d, header_id: d.header_id || "", footer_id: d.footer_id || "", page_template_id: d.page_template_id || "", category_id: d.category_id || "",
+        sections: (d.sections || []).map(s => ({
+          ...s,
+          variables: typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}),
+          variable_origins: typeof s.variable_origins === "string" ? JSON.parse(s.variable_origins || "{}") : (s.variable_origins || {}),
+          type_variables: typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []),
+        }))
+      });
+      setLoading(false);
+    });
   }, [id, isNew]);
 
   const set = (f) => (e) => setForm({ ...form, [f]: e.target.value });
@@ -145,6 +146,8 @@ export default function EditPage() {
       router.push("/cms-admin");
     } catch { alert("Save failed"); setSaving(false); }
   }
+
+  if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading…</p>;
 
   return (
     <>
