@@ -176,9 +176,12 @@ export default function EditPage() {
                         const origin = (s.variable_origins || {})[v.key];
                         const originSource = typeof origin === "object" ? origin?.source : origin;
                         const badge = originSource === "manual" ? "✏️" : originSource === "ai_generated" ? "🤖" : null;
+                        const tooltip = typeof origin === "object"
+                          ? (origin.source === "ai_generated" ? `AI generated${origin.generated_at ? ` at ${new Date(origin.generated_at).toLocaleString()}` : ""}${origin.job_id ? ` (job #${origin.job_id})` : ""}` : `Manually edited${origin.edited_at ? ` at ${new Date(origin.edited_at).toLocaleString()}` : ""}`)
+                          : (origin || "");
                         return (
                         <div key={v.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center", gap: 8, paddingBlock: 6, borderBottom: "1px solid var(--border)" }}>
-                          <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={origin} style={{ fontSize: 11 }}>{badge}</span>}</label>
+                          <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={tooltip} style={{ fontSize: 11, cursor: "help" }}>{badge}</span>}</label>
                           <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""} placeholder={v.type === "fixed" && v.label ? substituteVars(v.label, ctx) : ""}
                             onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: { source: "manual", edited_at: new Date().toISOString() } } }; setForm({ ...form, sections: sec }); }} />
                         </div>
