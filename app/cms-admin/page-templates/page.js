@@ -54,32 +54,26 @@ export default function PageTemplatesPage() {
 
   function renderExtra({ form, setForm, save, saving, saved, error }) {
     return (
-      <>
-        {/* Header/Footer Selectors */}
-        <div className="card">
-          <div className="card-title">Blueprint Defaults</div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <div className="form-field" style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: "block" }}>Default Header</label>
-              <select className="form-input" value={form.header_id || ""} onChange={e => setForm({ ...form, header_id: e.target.value ? Number(e.target.value) : null })} aria-label="Default header">
-                <option value="">None</option>
-                {headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-              </select>
-            </div>
-            <div className="form-field" style={{ flex: 1, minWidth: 200 }}>
-              <label style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: "block" }}>Default Footer</label>
-              <select className="form-input" value={form.footer_id || ""} onChange={e => setForm({ ...form, footer_id: e.target.value ? Number(e.target.value) : null })} aria-label="Default footer">
-                <option value="">None</option>
-                {footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
-            </div>
+      <div className="card">
+        <div className="card-title">Blueprint Setup</div>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 16 }}>
+          <div className="form-field" style={{ flex: 1, minWidth: 200 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: "block" }}>Default Header</label>
+            <select className="form-input" value={form.header_id || ""} onChange={e => setForm({ ...form, header_id: e.target.value ? Number(e.target.value) : null })} aria-label="Default header">
+              <option value="">None</option>
+              {headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+          </div>
+          <div className="form-field" style={{ flex: 1, minWidth: 200 }}>
+            <label style={{ fontSize: 13, fontWeight: 500, marginBottom: 4, display: "block" }}>Default Footer</label>
+            <select className="form-input" value={form.footer_id || ""} onChange={e => setForm({ ...form, footer_id: e.target.value ? Number(e.target.value) : null })} aria-label="Default footer">
+              <option value="">None</option>
+              {footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
           </div>
         </div>
-
-        {/* Blueprint Sections */}
-        <div className="card">
-          <div className="card-title">Blueprint Sections</div>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Section types that will be auto-created when a page uses this template.</p>
+        <label style={{ fontSize: 13, fontWeight: 500, marginBottom: 8, display: "block" }}>Sections</label>
+        <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Section types that will be auto-created when a page uses this template.</p>
           {(form.sections || []).map((s, i) => {
             const st = sectionTypes.find(t => t.id === s.section_type_id);
             return (
@@ -115,8 +109,7 @@ export default function PageTemplatesPage() {
             {saved && <span className="toast-saved">✓ Saved</span>}
             {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
           </div>
-        </div>
-      </>
+      </div>
     );
   }
 
