@@ -1,4 +1,4 @@
-import pool from "@/lib/db";
+import pool, { getPool } from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validString, validSlug, validStatus, err } from "@/lib/validate";
@@ -65,25 +65,36 @@ export async function POST(req) {
     }
     const varCtx = { category: categoryName, title: title || "", slug: slug || "" };
 
-    const [result] = await pool.query(
-      "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [title, slug, effectiveHeaderId, effectiveFooterId, page_template_id || 1, status || "draft", category_id || null]
-    );
-    const pageId = result.insertId;
+    const conn = await getPool().getConnection();
+    let pageId;
+    try {
+      await conn.beginTransaction();
+      const [result] = await conn.query(
+        "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        [title, slug, effectiveHeaderId, effectiveFooterId, page_template_id || 1, status || "draft", category_id || null]
+      );
+      pageId = result.insertId;
 
-    if (sections?.length) {
-      const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
-      await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
-    } else if (blueprintSections) {
-      const values = blueprintSections.map(s => {
-        const typeVars = (() => { try { return typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []); } catch { return []; } })();
-        const vars = {};
-        for (const v of typeVars) {
-          if (v.type === "fixed" && v.label) vars[v.key] = substituteVars(v.label, varCtx);
-        }
-        return [pageId, s.section_type_id, s.default_content, JSON.stringify(vars), "{}", s.sort_order];
-      });
-      await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
+      if (sections?.length) {
+        const values = sections.map((s, i) => [pageId, s.section_type_id, s.content, JSON.stringify(s.variables || {}), JSON.stringify(s.variable_origins || {}), i]);
+        await conn.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
+      } else if (blueprintSections) {
+        const values = blueprintSections.map(s => {
+          const typeVars = (() => { try { return typeof s.type_variables === "string" ? JSON.parse(s.type_variables || "[]") : (s.type_variables || []); } catch { return []; } })();
+          const vars = {};
+          for (const v of typeVars) {
+            if (v.type === "fixed" && v.label) vars[v.key] = substituteVars(v.label, varCtx);
+          }
+          return [pageId, s.section_type_id, s.default_content, JSON.stringify(vars), "{}", s.sort_order];
+        });
+        await conn.query("INSERT INTO sections (page_id, section_type_id, content, variables, variable_origins, sort_order) VALUES ?", [values]);
+      }
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback();
+      throw e;
+    } finally {
+      conn.release();
     }
 
     return NextResponse.json({ id: pageId }, { status: 201 });
