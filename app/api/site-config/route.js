@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
@@ -25,6 +26,7 @@ export async function PUT(req) {
     for (const [key, value] of Object.entries(data)) {
       await pool.query("INSERT INTO site_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value=?", [key, value, value]);
     }
+    try { revalidatePath("/", "layout"); } catch { /* best-effort */ }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
