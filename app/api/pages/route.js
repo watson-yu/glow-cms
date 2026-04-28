@@ -58,7 +58,7 @@ export async function POST(req) {
     }
 
     // Build context for variable substitution
-    const varCtx = { category: "", parent_category: "", category_description: "", parent_category_description: "", title: title || "", slug: slug || "" };
+    const varCtx = { category: "", parent_category: "", category_description: "", parent_category_description: "", title: title || "", slug: slug || "", site_title: "" };
     if (category_id) {
       const [catRows] = await pool.query("SELECT c.name, c.description, c.parent_id, p.name as parent_name, p.description as parent_description FROM categories c LEFT JOIN categories p ON c.parent_id = p.id WHERE c.id = ?", [category_id]);
       if (catRows.length) {
@@ -68,6 +68,8 @@ export async function POST(req) {
         varCtx.parent_category_description = catRows[0].parent_description || "";
       }
     }
+    const [siteRows] = await pool.query("SELECT config_value FROM site_config WHERE config_key = 'site_title'");
+    varCtx.site_title = siteRows[0]?.config_value || "";
 
     const conn = await getPool().getConnection();
     let pageId;
