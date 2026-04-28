@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS pages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   title VARCHAR(255) NOT NULL,
   slug VARCHAR(255) NOT NULL UNIQUE,
-  status ENUM('draft','published') DEFAULT 'draft',
+  status ENUM('draft','generating','ready_for_review','generation_failed','published') DEFAULT 'draft',
   header_id INT DEFAULT NULL,
   footer_id INT DEFAULT NULL,
   page_template_id INT DEFAULT 1,

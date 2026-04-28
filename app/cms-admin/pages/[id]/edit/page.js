@@ -215,6 +215,9 @@ export default function EditPage() {
                 <label>Status</label>
                 <select value={form.status} onChange={set("status")} className="form-input">
                   <option value="draft">Draft</option>
+                  <option value="generating">Generating</option>
+                  <option value="ready_for_review">Ready for Review</option>
+                  <option value="generation_failed">Generation Failed</option>
                   <option value="published">Published</option>
                 </select>
               </div>
