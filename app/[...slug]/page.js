@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { getPageBySlug, getContentPath } from "@/lib/pages";
 import PageView from "@/app/components/PageView";
 
-export const dynamic = "force-dynamic";
+export const revalidate = 3600;
 
 export default async function PublicPage({ params }) {
   const { slug } = await params;

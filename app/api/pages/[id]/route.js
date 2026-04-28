@@ -1,8 +1,10 @@
 import pool from "@/lib/db";
 import { getPool } from "@/lib/db";
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { validId, validString, validSlug, validStatus, err } from "@/lib/validate";
+import { getContentPath } from "@/lib/pages";
 
 export async function GET(req, { params }) {
   const authError = await requireAuth();
@@ -63,6 +65,10 @@ export async function PUT(req, { params }) {
     } finally {
       conn.release();
     }
+    try {
+      const cp = await getContentPath();
+      revalidatePath(`${cp}/${slug}`);
+    } catch { /* revalidation is best-effort */ }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
