@@ -8,6 +8,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [genJobs, setGenJobs] = useState({});
 
   useEffect(() => {
     Promise.all([
@@ -18,6 +19,12 @@ export default function Home() {
       const cp = c.content_path || "";
       setContentPath(!cp || cp === "/" ? "" : cp.startsWith("/") ? cp : `/${cp}`);
       setLoading(false);
+      // Fetch generation jobs for all pages
+      if (p.length) {
+        fetch(`/api/generation-jobs?page_ids=${p.map(pg => pg.id).join(",")}`).then(r => r.json()).then(jobs => {
+          setGenJobs(Object.fromEntries(jobs.map(j => [j.page_id, j])));
+        });
+      }
     });
   }, []);
 
@@ -51,7 +58,11 @@ export default function Home() {
               <tr key={p.id}>
                 <td><Link href={`/cms-admin/pages/${p.id}`} className="link">{p.title}</Link></td>
                 <td style={{ fontSize: 13, color: "var(--text-muted)" }}>{publicUrl(p.slug)}</td>
-                <td><span className={`badge badge-${p.status}`}>{p.status}</span></td>
+                <td>
+                  <span className={`badge badge-${p.status}`}>{p.status}</span>
+                  {genJobs[p.id] && genJobs[p.id].status === "running" && <span className="badge" style={{ background: "#fef3c7", color: "#92400e", marginLeft: 4 }}>⏳ generating</span>}
+                  {genJobs[p.id] && genJobs[p.id].status === "failed" && <span className="badge" style={{ background: "#fef2f2", color: "var(--danger)", marginLeft: 4 }}>✗ gen failed</span>}
+                </td>
                 <td>
                   <Link href={`/cms-admin/pages/${p.id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
                   <a href={`/preview/${p.slug}`} target="_blank" className="btn btn-ghost btn-sm">Preview</a>
