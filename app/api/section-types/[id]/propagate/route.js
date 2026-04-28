@@ -44,6 +44,9 @@ export async function POST(req, { params }) {
     );
     if (!sections.length) return NextResponse.json({ updated: 0 });
 
+    const [stRows] = await pool.query("SELECT config_value FROM site_config WHERE config_key = 'site_title'");
+    const siteTitle = stRows[0]?.config_value || "";
+
     if (action === "template_only") {
       return NextResponse.json({ updated: 0, action });
     }
@@ -53,7 +56,7 @@ export async function POST(req, { params }) {
       for (const s of sections) {
         const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
         const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
-        const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
+        const ctx = { category: s.category_name || "", slug: s.slug, title: s.title, site_title: siteTitle };
         let changed = false;
         for (const v of typeVars) {
           if (v.type !== "fixed" || !v.label) continue;
@@ -77,7 +80,7 @@ export async function POST(req, { params }) {
       for (const s of sections) {
         const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
         const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
-        const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
+        const ctx = { category: s.category_name || "", slug: s.slug, title: s.title, site_title: siteTitle };
         let changed = false;
         for (const v of typeVars) {
           if (v.type !== "fixed" || !v.label) continue;
@@ -113,7 +116,7 @@ export async function POST(req, { params }) {
     for (const s of sections) {
       const vars = (() => { try { return JSON.parse(s.variables || "{}"); } catch { return {}; } })();
       const origins = (() => { try { return JSON.parse(s.variable_origins || "{}"); } catch { return {}; } })();
-      const ctx = { category: s.category_name || "", slug: s.slug, title: s.title };
+      const ctx = { category: s.category_name || "", slug: s.slug, title: s.title, site_title: siteTitle };
 
       const toGenerate = typeVars.filter(v => {
         if ((v.type || "prompt") !== "prompt" || !v.label) return false;

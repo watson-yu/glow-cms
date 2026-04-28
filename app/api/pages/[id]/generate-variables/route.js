@@ -23,6 +23,9 @@ export async function POST(req, { params }) {
     const page = pages[0];
     const ctx = { category: page.category_name || "", parent_category: page.parent_name || "", category_description: page.category_description || "", parent_category_description: page.parent_description || "", title: page.title || "", slug: page.slug || "" };
 
+    const [siteRows] = await pool.query("SELECT config_value FROM site_config WHERE config_key = 'site_title'");
+    ctx.site_title = siteRows[0]?.config_value || "";
+
     const apiKey = await getKey("gemini_api_key");
     if (!apiKey) return NextResponse.json({ error: "No Gemini API key configured" }, { status: 400 });
 
