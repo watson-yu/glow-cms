@@ -113,26 +113,16 @@ export default function CategoriesPage() {
     loadPages();
     if (createdIds.length) {
       setGenStatus({ total: createdIds.length, done: 0, failed: 0 });
-      // Fire batch generation
-      fetch("/api/generation-jobs/batch", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page_ids: createdIds }),
-      });
-      // Poll job status
-      const pollInterval = setInterval(async () => {
-        try {
-          const r = await fetch(`/api/generation-jobs?page_ids=${createdIds.join(",")}`);
-          const jobs = await r.json();
-          const done = jobs.filter(j => j.status === "completed" && j.page_id !== 0).length;
-          const failed = jobs.filter(j => j.status === "failed" && j.page_id !== 0).length;
-          const running = jobs.filter(j => (j.status === "running" || j.status === "pending") && j.page_id !== 0).length;
-          setGenStatus({ total: createdIds.length, done: done + failed, failed });
-          if (!running && (done + failed) >= createdIds.length) {
-            clearInterval(pollInterval);
-            setTimeout(() => setGenStatus(null), failed ? 8000 : 3000);
-          }
-        } catch { /* ignore poll errors */ }
-      }, 2000);
+      try {
+        const r = await fetch("/api/generation-jobs/batch", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ page_ids: createdIds }),
+        });
+        const data = await r.json();
+        setGenStatus({ total: data.total || createdIds.length, done: (data.done || 0) + (data.failed || 0), failed: data.failed || 0 });
+        loadPages();
+      } catch { setGenStatus({ total: createdIds.length, done: 0, failed: createdIds.length }); }
+      setTimeout(() => setGenStatus(null), genStatus?.failed ? 8000 : 3000);
     }
   }
 
