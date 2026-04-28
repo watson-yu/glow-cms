@@ -113,5 +113,5 @@ export default function PageTemplatesPage() {
     );
   }
 
-  return <TemplateManager apiPath="/api/page-templates" title="Page Templates" objectType="page_template" renderPreview={(html, extra) => renderPreview(html, extra)} renderExtra={renderExtra} collapseEditor />;
+  return <TemplateManager apiPath="/api/page-templates" listParams="?include=sections" title="Page Templates" objectType="page_template" renderPreview={(html, extra) => renderPreview(html, extra)} renderExtra={renderExtra} collapseEditor />;
 }

@@ -31,7 +31,7 @@ export default function CategoriesPage() {
     Promise.all([
       fetch("/api/headers").then(r => r.json()),
       fetch("/api/footers").then(r => r.json()),
-      fetch("/api/page-templates").then(r => r.json()),
+      fetch("/api/page-templates?include=sections").then(r => r.json()),
       fetch("/api/section-types").then(r => r.json()),
     ]).then(([h, f, pt, st]) => setOptions({ headers: h, footers: f, pageTemplates: pt, sectionTypes: st }));
   }, []);
