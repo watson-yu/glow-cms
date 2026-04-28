@@ -20,6 +20,7 @@ export default function CategoriesPage() {
   const [pageForm, setPageForm] = useState({ page_template_id: "", page_template_id_l1: "", page_template_id_l2: "", header_id: "", footer_id: "", status: "draft" });
   const [options, setOptions] = useState({ headers: [], footers: [], pageTemplates: [] });
   const [pageMap, setPageMap] = useState({}); // category_id -> page
+  const [creating, setCreating] = useState(false);
 
   const load = () => fetch("/api/categories").then(r => r.json()).then(setTree);
   const loadPages = () => fetch("/api/pages").then(r => r.json()).then(pages => {
@@ -85,6 +86,7 @@ export default function CategoriesPage() {
 
   async function submitCreatePage(e) {
     e.preventDefault();
+    setCreating(true);
     const cats = Array.isArray(createFor) ? createFor : [createFor];
     const hasL1 = cats.some(c => !c.parent_id);
     const hasL2 = cats.some(c => c.parent_id);
@@ -99,6 +101,7 @@ export default function CategoriesPage() {
       const data = await res.json();
       if (data.id) createdIds.push(data.id);
     }
+    setCreating(false);
     setCreateFor(null);
     setSelected(new Set());
     loadPages();
@@ -402,8 +405,8 @@ export default function CategoriesPage() {
                 </select>
               </div>
               <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 16 }}>
-                <button type="button" className="btn btn-ghost" onClick={() => setCreateFor(null)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Create {Array.isArray(createFor) ? `${createFor.length} Pages` : "Page"}</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setCreateFor(null)} disabled={creating}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={creating}>{creating ? "Creating…" : `Create ${Array.isArray(createFor) ? `${createFor.length} Pages` : "Page"}`}</button>
               </div>
             </form>
           </div>

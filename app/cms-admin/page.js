@@ -7,6 +7,7 @@ export default function Home() {
   const [contentPath, setContentPath] = useState("");
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -24,8 +25,11 @@ export default function Home() {
 
   async function deletePage() {
     if (!deleteTarget) return;
+    setDeleting(true);
     const res = await fetch(`/api/pages/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) setPages(prev => prev.filter(p => p.id !== deleteTarget.id));
+    else { const d = await res.json().catch(() => ({})); alert(d.error || "Delete failed"); }
+    setDeleting(false);
     setDeleteTarget(null);
   }
 
@@ -66,8 +70,8 @@ export default function Home() {
             <div className="card-title">Delete Page</div>
             <p style={{ fontSize: 14, marginBottom: 16 }}>Delete <strong>{deleteTarget.title}</strong>? This cannot be undone.</p>
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteTarget(null)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" style={{ background: "var(--danger)" }} onClick={deletePage}>Delete</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-primary btn-sm" style={{ background: "var(--danger)" }} onClick={deletePage} disabled={deleting}>{deleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         </div>
