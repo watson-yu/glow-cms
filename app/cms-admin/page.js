@@ -6,6 +6,7 @@ export default function Home() {
   const [pages, setPages] = useState([]);
   const [contentPath, setContentPath] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -21,10 +22,11 @@ export default function Home() {
 
   function publicUrl(slug) { return `${contentPath}/${slug}`; }
 
-  async function deletePage(id) {
-    if (!confirm("Delete this page?")) return;
-    const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
-    if (res.ok) setPages(prev => prev.filter(p => p.id !== id));
+  async function deletePage() {
+    if (!deleteTarget) return;
+    const res = await fetch(`/api/pages/${deleteTarget.id}`, { method: "DELETE" });
+    if (res.ok) setPages(prev => prev.filter(p => p.id !== deleteTarget.id));
+    setDeleteTarget(null);
   }
 
   if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading...</p>;
@@ -49,7 +51,7 @@ export default function Home() {
                 <td>
                   <Link href={`/cms-admin/pages/${p.id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
                   <a href={`/preview/${p.slug}`} target="_blank" className="btn btn-ghost btn-sm">Preview</a>
-                  <button onClick={() => deletePage(p.id)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Delete</button>
+                  <button onClick={() => setDeleteTarget(p)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Delete</button>
                 </td>
               </tr>
             ))}
@@ -57,6 +59,19 @@ export default function Home() {
           </tbody>
         </table>
       </div>
+
+      {deleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div className="card" style={{ maxWidth: 400, width: "100%", margin: 20 }}>
+            <div className="card-title">Delete Page</div>
+            <p style={{ fontSize: 14, marginBottom: 16 }}>Delete <strong>{deleteTarget.title}</strong>? This cannot be undone.</p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" style={{ background: "var(--danger)" }} onClick={deletePage}>Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
