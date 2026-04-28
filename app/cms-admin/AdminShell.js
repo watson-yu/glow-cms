@@ -22,6 +22,7 @@ const sections = [
     { href: `${P}/users`, label: "Users" },
     { href: `${P}/prompts`, label: "Prompts" },
     { href: `${P}/generation-logs`, label: "Generation Logs" },
+    { href: `${P}/generation-jobs`, label: "Generation Jobs" },
     { href: `${P}/site-config`, label: "Site Config" },
     { href: `${P}/system-config`, label: "System Config" },
   ]},
