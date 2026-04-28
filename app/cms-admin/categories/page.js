@@ -89,16 +89,23 @@ export default function CategoriesPage() {
     const hasL1 = cats.some(c => !c.parent_id);
     const hasL2 = cats.some(c => c.parent_id);
     const isMixed = hasL1 && hasL2;
+    const createdIds = [];
     for (const cat of cats) {
       const tplId = isMixed ? (cat.parent_id ? pageForm.page_template_id_l2 : pageForm.page_template_id_l1) : pageForm.page_template_id;
-      await fetch("/api/pages", {
+      const res = await fetch("/api/pages", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: pageForm.status }),
       });
+      const data = await res.json();
+      if (data.id) createdIds.push(data.id);
     }
     setCreateFor(null);
     setSelected(new Set());
     loadPages();
+    // Fire-and-forget: generate prompt variables for created pages
+    for (const pid of createdIds) {
+      fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
+    }
   }
 
   async function clearAll() {
