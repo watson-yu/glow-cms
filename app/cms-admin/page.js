@@ -34,6 +34,15 @@ export default function Home() {
 
   function publicUrl(slug) { return `${contentPath}/${slug}`; }
 
+  async function unpublish(id) {
+    const detail = await (await fetch(`/api/pages/${id}`)).json();
+    if (!detail.id) return;
+    const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...detail, status: "draft" }),
+    });
+    if (res.ok) loadPages();
+  }
+
   async function deletePage() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -78,6 +87,7 @@ export default function Home() {
                 <td>
                   <Link href={`/cms-admin/pages/${p.id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
                   <a href={`/preview/${p.slug}`} target="_blank" className="btn btn-ghost btn-sm">Preview</a>
+                  {p.status === "published" && <button onClick={() => unpublish(p.id)} className="btn btn-ghost btn-sm">Unpublish</button>}
                   <button onClick={() => setDeleteTarget(p)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={p.status === "published"} title={p.status === "published" ? "Unpublish before deleting" : ""}>Delete</button>
                 </td>
               </tr>
