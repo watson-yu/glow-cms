@@ -78,7 +78,7 @@ export default function CategoriesPage() {
     const cats = all.filter(c => selected.has(c.id) && !pageMap[c.id]);
     if (!cats.length) return;
     setCreateFor(cats);
-    setPageForm({ header_id: options.headers[0]?.id || "", footer_id: options.footers[0]?.id || "", page_template_id: options.pageTemplates[0]?.id || "", status: "draft" });
+    setPageForm({ header_id: "", footer_id: "", page_template_id: options.pageTemplates[0]?.id || "", status: "draft" });
   }
 
   async function submitCreatePage(e) {
