@@ -204,6 +204,17 @@ export default function EditPage() {
           <div className="editor-sidebar">
             <div className="card">
               <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>{saving ? "Saving…" : "Save Page"}</button>
+              {form.status === "published" && !isNew && (
+                <button type="button" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving} onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+                    if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Re-publish failed"); }
+                    else alert("Page re-published with fresh snapshot.");
+                  } catch { alert("Re-publish failed"); }
+                  setSaving(false);
+                }}>Re-publish Snapshot</button>
+              )}
               {form.slug && (
                 <a href={`/preview/${form.slug}`} target="_blank" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8, textAlign: "center" }}>Preview ↗</a>
               )}
