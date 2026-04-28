@@ -8,6 +8,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   function loadPages() {
     return fetch("/api/pages").then(r => r.json()).then(p => { setPages(p); return p; });
@@ -45,11 +46,21 @@ export default function Home() {
 
   if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading...</p>;
 
+  const statuses = ["all", ...new Set(pages.map(p => p.status))];
+  const filtered = statusFilter === "all" ? pages : pages.filter(p => p.status === statusFilter);
+
   return (
     <>
       <div className="page-header">
         <h1>Pages</h1>
         <Link href="/cms-admin/pages/new/edit" className="btn btn-primary">+ Add New</Link>
+      </div>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        {statuses.map(s => (
+          <button key={s} className={`btn btn-sm ${statusFilter === s ? "btn-primary" : "btn-ghost"}`} onClick={() => setStatusFilter(s)}>
+            {s === "all" ? "All" : s.replace(/_/g, " ")} {s !== "all" && <span style={{ opacity: 0.6 }}>({pages.filter(p => p.status === s).length})</span>}
+          </button>
+        ))}
       </div>
       <div className="table-wrap">
         <table aria-label="Pages list">
@@ -57,7 +68,7 @@ export default function Home() {
             <tr><th>Title</th><th>URL</th><th>Status</th><th>Actions</th></tr>
           </thead>
           <tbody>
-            {pages.map(p => (
+            {filtered.map(p => (
               <tr key={p.id}>
                 <td><Link href={`/cms-admin/pages/${p.id}`} className="link">{p.title}</Link></td>
                 <td style={{ fontSize: 13, color: "var(--text-muted)" }}>{publicUrl(p.slug)}</td>
@@ -71,7 +82,7 @@ export default function Home() {
                 </td>
               </tr>
             ))}
-            {!pages.length && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)", padding: 40 }}>No pages yet. Create your first page!</td></tr>}
+            {!filtered.length && <tr><td colSpan={4} style={{ textAlign: "center", color: "var(--text-muted)", padding: 40 }}>{statusFilter === "all" ? "No pages yet. Create your first page!" : "No pages with this status."}</td></tr>}
           </tbody>
         </table>
       </div>
