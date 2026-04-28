@@ -2,12 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { substituteVars } from "@/lib/template";
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
-async function getKey(key) {
-  const [rows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
-  return rows[0]?.config_value || "";
-}
+import { callLLM } from "@/lib/llm";
 
 export async function POST(req, { params }) {
   const authError = await requireAuth(req);
@@ -25,9 +20,6 @@ export async function POST(req, { params }) {
 
     const [siteRows] = await pool.query("SELECT config_value FROM site_config WHERE config_key = 'site_title'");
     ctx.site_title = siteRows[0]?.config_value || "";
-
-    const apiKey = await getKey("gemini_api_key");
-    if (!apiKey) return NextResponse.json({ error: "No Gemini API key configured" }, { status: 400 });
 
     const [sections] = await pool.query(
       "SELECT s.id, s.variables, s.variable_origins, st.variables as type_variables FROM sections s JOIN section_types st ON s.section_type_id = st.id WHERE s.page_id = ? ORDER BY s.sort_order",
@@ -48,8 +40,6 @@ export async function POST(req, { params }) {
     );
     const jobId = jobResult.insertId;
 
-    const client = new GoogleGenerativeAI(apiKey);
-    const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
     let done = 0;
     let lastError = null;
 
@@ -61,11 +51,11 @@ export async function POST(req, { params }) {
       const toGenerate = typeVars.filter(v => (v.type || "prompt") === "prompt" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual");
       if (!toGenerate.length) continue;
 
-      const prompt = toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n");
+      const prompt = `Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n")}`;
       try {
-        const res = await model.generateContent(`Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${prompt}`);
-        const raw = res.response.text().replace(/```json?\n?|\n?```/g, "").trim();
-        const values = JSON.parse(raw);
+        const result = await callLLM({ provider: "gemini", prompt });
+        const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
+        const values = JSON.parse(clean);
         for (const k of Object.keys(values)) {
           vars[k] = values[k];
           origins[k] = { source: "ai_generated", job_id: jobId, generated_at: new Date().toISOString() };

@@ -2,15 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { substituteVars } from "@/lib/template";
 import { requireAuth } from "@/lib/auth";
-
-async function getPromptStack(sectionTypeId) {
-  const [rows] = await pool.query(
-    "SELECT scope_key, content FROM prompts WHERE scope_key IN ('system', 'section_type', ?) AND is_active = 1",
-    [`section_type:${sectionTypeId}`]
-  );
-  const map = Object.fromEntries(rows.map(r => [r.scope_key, r.content]));
-  return [map["system"], map["section_type"], map[`section_type:${sectionTypeId}`]].filter(Boolean).join("\n\n");
-}
+import { callLLM } from "@/lib/llm";
 
 // Missing origin on an existing value = legacy row, treat as manual (safest assumption)
 function originOf(origins, vars, key) {
@@ -102,15 +94,6 @@ export async function POST(req, { params }) {
     }
 
     // generate_missing / refresh_ai — need LLM
-    const [sysRows] = await pool.query("SELECT config_value FROM system_config WHERE config_key = 'gemini_api_key'");
-    const apiKey = sysRows[0]?.config_value;
-    if (!apiKey) return NextResponse.json({ error: "No Gemini API key configured" }, { status: 400 });
-
-    const { GoogleGenerativeAI } = await import("@google/generative-ai");
-    const genModel = new GoogleGenerativeAI(apiKey).getGenerativeModel({ model: "gemini-2.5-flash" });
-
-    const systemPrompt = await getPromptStack(id);
-
     let updated = 0;
     let failed = 0;
     for (const s of sections) {
@@ -127,12 +110,10 @@ export async function POST(req, { params }) {
       });
       if (!toGenerate.length) continue;
 
-      const prompt = toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n");
+      const prompt = `Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n")}`;
       try {
-        const res = await genModel.generateContent([{
-          text: `${systemPrompt}\n\nGenerate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${prompt}`
-        }]);
-        const clean = res.response.text().replace(/```json?\n?|\n?```/g, "").trim();
+        const result = await callLLM({ provider: "gemini", prompt, objectType: "section_type", objectKey: `section_type:${id}` });
+        const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
         const values = JSON.parse(clean);
         for (const [k, val] of Object.entries(values)) {
           vars[k] = val;
