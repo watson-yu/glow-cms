@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validString, validSlug, validStatus, err } from "@/lib/validate";
+import { substituteVars } from "@/lib/template";
 
 export async function GET() {
   const authError = await requireAuth();
@@ -56,6 +57,14 @@ export async function POST(req) {
       }
     }
 
+    // Build context for variable substitution
+    let categoryName = "";
+    if (category_id) {
+      const [catRows] = await pool.query("SELECT name FROM categories WHERE id = ?", [category_id]);
+      if (catRows.length) categoryName = catRows[0].name;
+    }
+    const varCtx = { category: categoryName, title: title || "", slug: slug || "" };
+
     const [result] = await pool.query(
       "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
       [title, slug, effectiveHeaderId, effectiveFooterId, page_template_id || 1, status || "draft", category_id || null]
@@ -70,7 +79,7 @@ export async function POST(req) {
         const typeVars = (() => { try { return JSON.parse(s.type_variables || "[]"); } catch { return []; } })();
         const vars = {};
         for (const v of typeVars) {
-          if (v.type === "fixed" && v.label) vars[v.key] = v.label;
+          if (v.type === "fixed" && v.label) vars[v.key] = substituteVars(v.label, varCtx);
         }
         return [pageId, s.section_type_id, s.default_content, JSON.stringify(vars), "{}", s.sort_order];
       });
