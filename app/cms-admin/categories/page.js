@@ -93,15 +93,20 @@ export default function CategoriesPage() {
     const hasL2 = cats.some(c => c.parent_id);
     const isMixed = hasL1 && hasL2;
     const createdIds = [];
+    const errors = [];
     for (const cat of cats) {
       const tplId = isMixed ? (cat.parent_id ? pageForm.page_template_id_l2 : pageForm.page_template_id_l1) : pageForm.page_template_id;
-      const res = await fetch("/api/pages", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: pageForm.status }),
-      });
-      const data = await res.json();
-      if (data.id) createdIds.push(data.id);
+      try {
+        const res = await fetch("/api/pages", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: cat.name, slug: cat.slug, category_id: cat.id, page_template_id: tplId, header_id: pageForm.header_id, footer_id: pageForm.footer_id, status: pageForm.status }),
+        });
+        const data = await res.json();
+        if (data.id) createdIds.push(data.id);
+        else errors.push(`${cat.name}: ${data.error || "Unknown error"}`);
+      } catch (e) { errors.push(`${cat.name}: ${e.message}`); }
     }
+    if (errors.length) alert(`Failed to create ${errors.length} page(s):\n${errors.join("\n")}`);
     setCreating(false);
     setCreateFor(null);
     setSelected(new Set());
