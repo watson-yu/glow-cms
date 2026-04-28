@@ -76,6 +76,9 @@ export async function DELETE(req, { params }) {
   try {
 
     const { id } = await params;
+    const [rows] = await pool.query("SELECT status FROM pages WHERE id = ?", [id]);
+    if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (rows[0].status === "published") return NextResponse.json({ error: "Cannot delete a published page. Unpublish it first." }, { status: 409 });
     await pool.query("DELETE FROM pages WHERE id = ?", [id]);
     return NextResponse.json({ ok: true });
   } catch (e) {
