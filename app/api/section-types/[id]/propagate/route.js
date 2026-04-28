@@ -14,7 +14,8 @@ async function getPromptStack(sectionTypeId) {
 
 // Missing origin on an existing value = legacy row, treat as manual (safest assumption)
 function originOf(origins, vars, key) {
-  if (origins[key]) return origins[key];
+  const o = origins[key];
+  if (o) return typeof o === "object" ? o.source : o;
   return vars[key] ? "manual" : "empty";
 }
 
@@ -59,7 +60,7 @@ export async function POST(req, { params }) {
           if (vars[v.key]) continue; // value already exists, regardless of origin
           const val = substituteVars(v.label, ctx);
           vars[v.key] = val;
-          origins[v.key] = "ai_generated";
+          origins[v.key] = { source: "ai_generated", generated_at: new Date().toISOString() };
           changed = true;
         }
         if (changed) {
@@ -84,7 +85,7 @@ export async function POST(req, { params }) {
           const val = substituteVars(v.label, ctx);
           if (vars[v.key] !== val) {
             vars[v.key] = val;
-            origins[v.key] = "ai_generated";
+            origins[v.key] = { source: "ai_generated", generated_at: new Date().toISOString() };
             changed = true;
           }
         }
@@ -132,7 +133,7 @@ export async function POST(req, { params }) {
         const values = JSON.parse(clean);
         for (const [k, val] of Object.entries(values)) {
           vars[k] = val;
-          origins[k] = "ai_generated";
+          origins[k] = { source: "ai_generated", generated_at: new Date().toISOString() };
         }
         await pool.query("UPDATE sections SET variables = ?, variable_origins = ? WHERE id = ?",
           [JSON.stringify(vars), JSON.stringify(origins), s.id]);

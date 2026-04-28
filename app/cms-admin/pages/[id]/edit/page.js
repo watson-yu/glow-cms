@@ -65,9 +65,9 @@ export default function EditPage() {
       const vars = { ...(s.variables || {}) };
       const origins = { ...(s.variable_origins || {}) };
       s.type_variables.forEach(v => {
-        if (!vars[v.key] && (v.type || "prompt") === "fixed" && v.label && origins[v.key] !== "manual") {
+        if (!vars[v.key] && (v.type || "prompt") === "fixed" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual") {
           vars[v.key] = substituteVars(v.label, ctx);
-          origins[v.key] = "ai_generated";
+          origins[v.key] = { source: "ai_generated", generated_at: new Date().toISOString() };
           updated = true;
         }
       });
@@ -105,7 +105,7 @@ export default function EditPage() {
     const ctx = getPageContext();
     const origins = s.variable_origins || {};
     const toGenerate = s.type_variables.filter(v =>
-      (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual"
+      (v.type || "prompt") === "prompt" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual"
     );
     if (!toGenerate.length) return;
 
@@ -129,7 +129,7 @@ export default function EditPage() {
       setForm(prev => {
         const sec = [...prev.sections];
         const newOrigins = { ...sec[sectionIdx].variable_origins };
-        for (const k of Object.keys(values)) newOrigins[k] = "ai_generated";
+        for (const k of Object.keys(values)) newOrigins[k] = { source: "ai_generated", generated_at: new Date().toISOString() };
         sec[sectionIdx] = { ...sec[sectionIdx], variables: { ...sec[sectionIdx].variables, ...values }, variable_origins: newOrigins };
         return { ...prev, sections: sec };
       });
@@ -174,12 +174,13 @@ export default function EditPage() {
                         const cat = allCats.find(c => c.id === Number(form.category_id));
                         const ctx = { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
                         const origin = (s.variable_origins || {})[v.key];
-                        const badge = origin === "manual" ? "✏️" : origin === "ai_generated" ? "🤖" : null;
+                        const originSource = typeof origin === "object" ? origin?.source : origin;
+                        const badge = originSource === "manual" ? "✏️" : originSource === "ai_generated" ? "🤖" : null;
                         return (
                         <div key={v.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center", gap: 8, paddingBlock: 6, borderBottom: "1px solid var(--border)" }}>
                           <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={origin} style={{ fontSize: 11 }}>{badge}</span>}</label>
                           <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""} placeholder={v.type === "fixed" && v.label ? substituteVars(v.label, ctx) : ""}
-                            onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: "manual" } }; setForm({ ...form, sections: sec }); }} />
+                            onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: { source: "manual", edited_at: new Date().toISOString() } } }; setForm({ ...form, sections: sec }); }} />
                         </div>
                         );
                       })}
