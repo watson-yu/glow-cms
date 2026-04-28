@@ -112,7 +112,7 @@ export async function POST(req, { params }) {
 
       const prompt = `Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n")}`;
       try {
-        const result = await callLLM({ provider: "gemini", prompt, objectType: "section_type", objectKey: `section_type:${id}` });
+        const result = await callLLM({ provider: "gemini", prompt, skipPromptChain: true });
         const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
         const values = JSON.parse(clean);
         for (const [k, val] of Object.entries(values)) {
