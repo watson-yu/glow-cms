@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth";
 import { validId, validString, validSlug, validStatus, err } from "@/lib/validate";
-import { getContentPath } from "@/lib/pages";
+import { getContentPath, renderPageSnapshot } from "@/lib/pages";
 
 export async function GET(req, { params }) {
   const authError = await requireAuth();
@@ -65,6 +65,11 @@ export async function PUT(req, { params }) {
     } finally {
       conn.release();
     }
+    // Render/clear HTML snapshot based on status
+    try {
+      if (status === "published") await renderPageSnapshot(id);
+      else await pool.query("UPDATE pages SET rendered_html = NULL WHERE id = ?", [id]);
+    } catch (e) { console.error("Snapshot render error:", e); }
     try {
       const cp = await getContentPath();
       revalidatePath(`${cp}/${slug}`);
