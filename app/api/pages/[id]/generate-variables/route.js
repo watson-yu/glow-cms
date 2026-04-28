@@ -35,7 +35,7 @@ export async function POST(req, { params }) {
     const sectionsToGen = sections.filter(sec => {
       const tv = typeof sec.type_variables === "string" ? JSON.parse(sec.type_variables || "[]") : (sec.type_variables || []);
       const origins = typeof sec.variable_origins === "string" ? JSON.parse(sec.variable_origins || "{}") : (sec.variable_origins || {});
-      return tv.some(v => (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual");
+      return tv.some(v => (v.type || "prompt") === "prompt" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual");
     });
 
     // Create job record
@@ -55,7 +55,7 @@ export async function POST(req, { params }) {
       const vars = (() => { try { return typeof sec.variables === "string" ? JSON.parse(sec.variables || "{}") : (sec.variables || {}); } catch { return {}; } })();
       const origins = (() => { try { return typeof sec.variable_origins === "string" ? JSON.parse(sec.variable_origins || "{}") : (sec.variable_origins || {}); } catch { return {}; } })();
 
-      const toGenerate = typeVars.filter(v => (v.type || "prompt") === "prompt" && v.label && origins[v.key] !== "manual");
+      const toGenerate = typeVars.filter(v => (v.type || "prompt") === "prompt" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual");
       if (!toGenerate.length) continue;
 
       const prompt = toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n");
@@ -65,7 +65,7 @@ export async function POST(req, { params }) {
         const values = JSON.parse(raw);
         for (const k of Object.keys(values)) {
           vars[k] = values[k];
-          origins[k] = "ai_generated";
+          origins[k] = { source: "ai_generated", job_id: jobId, generated_at: new Date().toISOString() };
         }
         await pool.query("UPDATE sections SET variables = ?, variable_origins = ? WHERE id = ?", [JSON.stringify(vars), JSON.stringify(origins), sec.id]);
         done++;
