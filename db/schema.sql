@@ -75,6 +75,7 @@ CREATE TABLE IF NOT EXISTS pages (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   category_id INT DEFAULT NULL,
+  rendered_html MEDIUMTEXT DEFAULT NULL,
   CONSTRAINT fk_pages_header FOREIGN KEY (header_id) REFERENCES headers(id),
   CONSTRAINT fk_pages_footer FOREIGN KEY (footer_id) REFERENCES footers(id),
   CONSTRAINT fk_pages_template FOREIGN KEY (page_template_id) REFERENCES page_templates(id),
