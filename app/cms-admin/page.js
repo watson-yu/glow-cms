@@ -9,17 +9,27 @@ export default function Home() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  function loadPages() {
+    return fetch("/api/pages").then(r => r.json()).then(p => { setPages(p); return p; });
+  }
+
   useEffect(() => {
     Promise.all([
-      fetch("/api/pages").then(r => r.json()),
+      loadPages(),
       fetch("/api/site-config").then(r => r.json()),
     ]).then(([p, c]) => {
-      setPages(p);
       const cp = c.content_path || "";
       setContentPath(!cp || cp === "/" ? "" : cp.startsWith("/") ? cp : `/${cp}`);
       setLoading(false);
     });
   }, []);
+
+  // Auto-refresh while any page is generating
+  useEffect(() => {
+    if (!pages.some(p => p.status === "generating")) return;
+    const t = setInterval(loadPages, 3000);
+    return () => clearInterval(t);
+  }, [pages]);
 
   function publicUrl(slug) { return `${contentPath}/${slug}`; }
 
