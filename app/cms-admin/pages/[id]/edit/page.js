@@ -152,101 +152,107 @@ export default function EditPage() {
   return (
     <>
       <Link href="/cms-admin" className="back-link">← Back to Pages</Link>
-      <div className="page-header"><h1>{isNew ? "Add New Page" : "Edit Page"}</h1></div>
       <form onSubmit={save}>
-        <div className="card">
-          <div className="card-title">Page Info</div>
-          <div className="form-field"><label>Title</label><input value={form.title} onChange={set("title")} required className="form-input" /></div>
-          <div className="form-field"><label>Slug</label><input value={form.slug} onChange={set("slug")} required className="form-input" />
-            {form.slug && (
-              <div style={{ marginTop: 6, fontSize: 13, color: "var(--text-muted)" }}>
-                Public: <code>{contentPath}/{form.slug}</code> · Preview: <a href={`/preview/${form.slug}`} target="_blank" className="link" style={{ fontSize: 13 }}>/preview/{form.slug}</a>
-              </div>
-            )}
-          </div>
-          <div className="form-field">
-            <label>Status</label>
-            <select value={form.status} onChange={set("status")} className="form-input">
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </select>
-          </div>
-          <div className="form-field">
-            <label>Category</label>
-            <select value={form.category_id} onChange={set("category_id")} className="form-input">
-              <option value="">— None —</option>
-              {categories.map(p => [
-                <option key={p.id} value={p.id}>{p.name}</option>,
-                ...p.children.map(c => <option key={c.id} value={c.id}>&nbsp;&nbsp;↳ {c.name}</option>)
-              ])}
-            </select>
-          </div>
-        </div>
+        <div className="editor-layout">
+          {/* Left: main content */}
+          <div className="editor-main">
+            <input value={form.title} onChange={set("title")} required className="form-input editor-title" placeholder="Page title" />
 
-        <div className="card">
-          <div className="card-title">Page Template</div>
-          <select value={form.page_template_id} onChange={set("page_template_id")} className="form-input">
-            {pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Header</div>
-          <select value={form.header_id} onChange={set("header_id")} className="form-input">
-            <option value="">— None —</option>
-            {headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-          </select>
-        </div>
-
-        <div className="card">
-          <div className="card-title">Sections</div>
-          {form.sections.map((s, i) => (
-            <div key={i} className="section-item">
-              <div className="section-item-header">
-                <strong>🧩 {s.type_name || `Section ${i + 1}`}</strong>
-                <button type="button" onClick={() => removeSection(i)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Remove</button>
-              </div>
-              {s.type_variables?.length > 0 && (
-                <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
-                  <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, fontWeight: 500 }}>Variables</div>
-                  {s.type_variables.map(v => {
-                    const allCats = categories.flatMap(p => [p, ...p.children]);
-                    const cat = allCats.find(c => c.id === Number(form.category_id));
-                    const ctx = { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
-                    const origin = (s.variable_origins || {})[v.key];
-                    const badge = origin === "manual" ? "✏️" : origin === "ai_generated" ? "🤖" : null;
-                    return (
-                    <div key={v.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center", gap: 8, paddingBlock: 6, borderBottom: "1px solid var(--border)" }}>
-                      <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={origin} style={{ fontSize: 11 }}>{badge}</span>}</label>
-                      <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""} placeholder={v.type === "fixed" && v.label ? substituteVars(v.label, ctx) : ""}
-                        onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: "manual" } }; setForm({ ...form, sections: sec }); }} />
+            <div className="card">
+              <div className="card-title">Sections</div>
+              {form.sections.map((s, i) => (
+                <div key={i} className="section-item">
+                  <div className="section-item-header">
+                    <strong>🧩 {s.type_name || `Section ${i + 1}`}</strong>
+                    <button type="button" onClick={() => removeSection(i)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Remove</button>
+                  </div>
+                  {s.type_variables?.length > 0 && (
+                    <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--bg)", borderRadius: "var(--radius-sm)", border: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6, fontWeight: 500 }}>Variables</div>
+                      {s.type_variables.map(v => {
+                        const allCats = categories.flatMap(p => [p, ...p.children]);
+                        const cat = allCats.find(c => c.id === Number(form.category_id));
+                        const ctx = { category: cat?.name || "", slug: form.slug || "", title: form.title || "" };
+                        const origin = (s.variable_origins || {})[v.key];
+                        const badge = origin === "manual" ? "✏️" : origin === "ai_generated" ? "🤖" : null;
+                        return (
+                        <div key={v.key} style={{ display: "grid", gridTemplateColumns: "180px 1fr", alignItems: "center", gap: 8, paddingBlock: 6, borderBottom: "1px solid var(--border)" }}>
+                          <label style={{ fontSize: 13 }}>{v.key} {badge && <span title={origin} style={{ fontSize: 11 }}>{badge}</span>}</label>
+                          <input className="form-input" style={{ fontSize: 13 }} value={(s.variables || {})[v.key] || ""} placeholder={v.type === "fixed" && v.label ? substituteVars(v.label, ctx) : ""}
+                            onChange={e => { const sec = [...form.sections]; sec[i] = { ...sec[i], variables: { ...sec[i].variables, [v.key]: e.target.value }, variable_origins: { ...sec[i].variable_origins, [v.key]: "manual" } }; setForm({ ...form, sections: sec }); }} />
+                        </div>
+                        );
+                      })}
+                      <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => autoGenerate(i)} disabled={generating[i]}>
+                        {generating[i] ? "⏳ Generating…" : "🤖 Re-generate"}
+                      </button>
                     </div>
-                    );
-                  })}
-                  <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 6 }} onClick={() => autoGenerate(i)} disabled={generating[i]}>
-                    {generating[i] ? "⏳ Generating…" : "🤖 Re-generate"}
-                  </button>
+                  )}
                 </div>
+              ))}
+              <div className="add-section-row">
+                <select className="form-input" value="" onChange={e => { if (e.target.value) addSection(e.target.value); }}>
+                  <option value="" disabled>+ Add section…</option>
+                  {sectionTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: sidebar */}
+          <div className="editor-sidebar">
+            <div className="card">
+              <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>{saving ? "Saving…" : "Save Page"}</button>
+              {form.slug && (
+                <a href={`/preview/${form.slug}`} target="_blank" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8, textAlign: "center" }}>Preview ↗</a>
               )}
             </div>
-          ))}
-          <div className="add-section-row">
-            <select className="form-input" value="" onChange={e => { if (e.target.value) addSection(e.target.value); }}>
-              <option value="" disabled>+ Add section…</option>
-              {sectionTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+            <div className="card">
+              <div className="form-field"><label>Slug</label><input value={form.slug} onChange={set("slug")} required className="form-input" />
+                {form.slug && <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>{contentPath}/{form.slug}</div>}
+              </div>
+              <div className="form-field">
+                <label>Status</label>
+                <select value={form.status} onChange={set("status")} className="form-input">
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Category</label>
+                <select value={form.category_id} onChange={set("category_id")} className="form-input">
+                  <option value="">— None —</option>
+                  {categories.map(p => [
+                    <option key={p.id} value={p.id}>{p.name}</option>,
+                    ...p.children.map(c => <option key={c.id} value={c.id}>&nbsp;&nbsp;↳ {c.name}</option>)
+                  ])}
+                </select>
+              </div>
+            </div>
+            <div className="card">
+              <div className="form-field">
+                <label>Page Template</label>
+                <select value={form.page_template_id} onChange={set("page_template_id")} className="form-input">
+                  {pageTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Header</label>
+                <select value={form.header_id} onChange={set("header_id")} className="form-input">
+                  <option value="">— None —</option>
+                  {headers.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+                </select>
+              </div>
+              <div className="form-field">
+                <label>Footer</label>
+                <select value={form.footer_id} onChange={set("footer_id")} className="form-input">
+                  <option value="">— None —</option>
+                  {footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="card">
-          <div className="card-title">Footer</div>
-          <select value={form.footer_id} onChange={set("footer_id")} className="form-input">
-            <option value="">— None —</option>
-            {footers.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        </div>
-
-        <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? "Saving…" : "Save Page"}</button>
       </form>
     </>
   );
