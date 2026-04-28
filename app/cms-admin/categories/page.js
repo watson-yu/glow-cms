@@ -113,20 +113,21 @@ export default function CategoriesPage() {
     loadPages();
     if (createdIds.length) {
       setGenStatus({ total: createdIds.length, done: 0, failed: 0 });
-      // Fire off generation for all pages
-      for (const pid of createdIds) {
-        fetch(`/api/pages/${pid}/generate-variables`, { method: "POST" });
-      }
+      // Fire batch generation
+      fetch("/api/generation-jobs/batch", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page_ids: createdIds }),
+      });
       // Poll job status
       const pollInterval = setInterval(async () => {
         try {
           const r = await fetch(`/api/generation-jobs?page_ids=${createdIds.join(",")}`);
           const jobs = await r.json();
-          const done = jobs.filter(j => j.status === "completed").length;
-          const failed = jobs.filter(j => j.status === "failed").length;
-          const running = jobs.filter(j => j.status === "running" || j.status === "pending").length;
+          const done = jobs.filter(j => j.status === "completed" && j.page_id !== 0).length;
+          const failed = jobs.filter(j => j.status === "failed" && j.page_id !== 0).length;
+          const running = jobs.filter(j => (j.status === "running" || j.status === "pending") && j.page_id !== 0).length;
           setGenStatus({ total: createdIds.length, done: done + failed, failed });
-          if (!running && jobs.length === createdIds.length) {
+          if (!running && (done + failed) >= createdIds.length) {
             clearInterval(pollInterval);
             setTimeout(() => setGenStatus(null), failed ? 8000 : 3000);
           }
