@@ -58,12 +58,16 @@ export async function POST(req) {
     }
 
     // Build context for variable substitution
-    let categoryName = "";
+    const varCtx = { category: "", parent_category: "", category_description: "", parent_category_description: "", title: title || "", slug: slug || "" };
     if (category_id) {
-      const [catRows] = await pool.query("SELECT name FROM categories WHERE id = ?", [category_id]);
-      if (catRows.length) categoryName = catRows[0].name;
+      const [catRows] = await pool.query("SELECT c.name, c.description, c.parent_id, p.name as parent_name, p.description as parent_description FROM categories c LEFT JOIN categories p ON c.parent_id = p.id WHERE c.id = ?", [category_id]);
+      if (catRows.length) {
+        varCtx.category = catRows[0].name || "";
+        varCtx.category_description = catRows[0].description || "";
+        varCtx.parent_category = catRows[0].parent_name || "";
+        varCtx.parent_category_description = catRows[0].parent_description || "";
+      }
     }
-    const varCtx = { category: categoryName, title: title || "", slug: slug || "" };
 
     const conn = await getPool().getConnection();
     let pageId;
