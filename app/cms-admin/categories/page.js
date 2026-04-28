@@ -32,7 +32,8 @@ export default function CategoriesPage() {
       fetch("/api/headers").then(r => r.json()),
       fetch("/api/footers").then(r => r.json()),
       fetch("/api/page-templates").then(r => r.json()),
-    ]).then(([h, f, pt]) => setOptions({ headers: h, footers: f, pageTemplates: pt }));
+      fetch("/api/section-types").then(r => r.json()),
+    ]).then(([h, f, pt, st]) => setOptions({ headers: h, footers: f, pageTemplates: pt, sectionTypes: st }));
   }, []);
 
   const [selected, setSelected] = useState(new Set());
@@ -296,7 +297,17 @@ export default function CategoriesPage() {
               {(() => {
                 const tpl = options.pageTemplates.find(t => String(t.id) === String(pageForm.page_template_id));
                 const isBlueprint = tpl && (tpl.header_id || tpl.footer_id || tpl.sections?.length);
-                if (isBlueprint) return null;
+                if (isBlueprint) {
+                  const hName = options.headers.find(h => h.id === tpl.header_id)?.name;
+                  const fName = options.footers.find(f => f.id === tpl.footer_id)?.name;
+                  const sNames = (tpl.sections || []).map(s => (options.sectionTypes || []).find(st => st.id === s.section_type_id)?.name || `#${s.section_type_id}`);
+                  return (
+                    <div style={{ fontSize: 13, color: "var(--text-muted)", background: "var(--bg-muted, #f5f5f5)", borderRadius: 6, padding: "8px 12px", marginBottom: 12 }}>
+                      <strong style={{ color: "var(--text)" }}>Blueprint:</strong>{" "}
+                      {[hName && `Header: ${hName}`, fName && `Footer: ${fName}`, sNames.length && `${sNames.length} section${sNames.length > 1 ? "s" : ""} (${sNames.join(", ")})`].filter(Boolean).join(" · ")}
+                    </div>
+                  );
+                }
                 return (
                   <>
                     <div className="form-field">
