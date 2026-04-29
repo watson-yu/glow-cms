@@ -67,7 +67,7 @@ export async function PUT(req, { params }) {
     }
     // Render/clear HTML snapshot based on status
     try {
-      if (status === "published" && updateSnapshot) await renderPageSnapshot(id);
+      if (status === "published" && updateSnapshot !== false) await renderPageSnapshot(id);
       else if (status !== "published") await pool.query("UPDATE pages SET rendered_html = NULL WHERE id = ?", [id]);
     } catch (e) { console.error("Snapshot render error:", e); }
     try {

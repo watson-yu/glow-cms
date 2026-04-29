@@ -119,10 +119,14 @@ export default function CategoriesPage() {
           body: JSON.stringify({ page_ids: createdIds }),
         });
         const data = await r.json();
-        setGenStatus({ total: data.total || createdIds.length, done: (data.done || 0) + (data.failed || 0), failed: data.failed || 0 });
+        const genData = { total: data.total || createdIds.length, done: (data.done || 0) + (data.failed || 0), failed: data.failed || 0 };
+        setGenStatus(genData);
         loadPages();
-      } catch { setGenStatus({ total: createdIds.length, done: 0, failed: createdIds.length }); }
-      setTimeout(() => setGenStatus(null), genStatus?.failed ? 8000 : 3000);
+        setTimeout(() => setGenStatus(null), genData.failed ? 8000 : 3000);
+      } catch {
+        setGenStatus({ total: createdIds.length, done: 0, failed: createdIds.length });
+        setTimeout(() => setGenStatus(null), 8000);
+      }
     }
   }
 
