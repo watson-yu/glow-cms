@@ -263,7 +263,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       {showVariables && (
         <div className="card">
           <div className="card-title">Page Variables</div>
-          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Define variables that will appear as input fields when this section is used in a page. Use <code>{"{{key}}"}</code> in the template above. Prompt supports <code>{"{{category}}"}</code> and other site variables.</p>
+          <p style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 12 }}>Define variables that will appear as input fields when this section is used in a page. Add <code>{"{{key}}"}</code> in the Template Source above for each variable to make it appear in the preview. Prompt supports <code>{"{{category}}"}</code> and other site variables.</p>
           {form.variables.map((v, i) => (
             <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
               <input className="form-input" placeholder="key" value={v.key} style={{ width: 160, fontFamily: "monospace", fontSize: 13 }}

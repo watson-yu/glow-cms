@@ -237,6 +237,7 @@ select.form-input { cursor: pointer; }
   border: 2px dashed #3b82f6;
   border-radius: var(--radius-sm);
   background: #fff;
+  min-height: 80px;
   overflow: auto;
 }
 .template-preview [style*="min-height: 100vh"] {
