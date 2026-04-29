@@ -220,12 +220,19 @@ export default function EditPage() {
                   <button type="button" className="btn btn-primary" style={{ width: "100%" }} disabled={saving} onClick={async () => {
                     setSaving(true);
                     try {
-                      const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+                      const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, updateSnapshot: true }) });
                       if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Re-publish failed"); }
                     } catch { alert("Re-publish failed"); }
                     setSaving(false);
-                  }}>{saving ? "Saving…" : "Re-publish Snapshot"}</button>
-                  <button type="submit" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving}>Save Changes</button>
+                  }}>{saving ? "Publishing…" : "Save & Re-publish"}</button>
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving} onClick={async () => {
+                    setSaving(true);
+                    try {
+                      const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, updateSnapshot: false }) });
+                      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Save failed"); }
+                    } catch { alert("Save failed"); }
+                    setSaving(false);
+                  }}>{saving ? "Saving…" : "Save Draft"}</button>
                   <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 4 }} disabled={saving} onClick={() => { setForm(f => ({ ...f, status: "draft" })); setTimeout(() => document.querySelector("form")?.requestSubmit(), 0); }}>Unpublish</button>
                 </>
               )}

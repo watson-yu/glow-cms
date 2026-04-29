@@ -42,7 +42,7 @@ export async function PUT(req, { params }) {
 
     const { id } = await params;
     if (!validId(id)) return err("Invalid ID");
-    const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
+    const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id, updateSnapshot = true } = await req.json();
     if (!validString(title, 500)) return err("title is required (max 500 chars)");
     if (!validSlug(slug)) return err("slug must be lowercase alphanumeric with hyphens");
     if (status && !validStatus(status)) return err("invalid status");
@@ -67,8 +67,8 @@ export async function PUT(req, { params }) {
     }
     // Render/clear HTML snapshot based on status
     try {
-      if (status === "published") await renderPageSnapshot(id);
-      else await pool.query("UPDATE pages SET rendered_html = NULL WHERE id = ?", [id]);
+      if (status === "published" && updateSnapshot) await renderPageSnapshot(id);
+      else if (status !== "published") await pool.query("UPDATE pages SET rendered_html = NULL WHERE id = ?", [id]);
     } catch (e) { console.error("Snapshot render error:", e); }
     try {
       const cp = await getContentPath();
