@@ -206,35 +206,58 @@ export default function EditPage() {
           {/* Right: sidebar */}
           <div className="editor-sidebar">
             <div className="card">
-              <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>{saving ? "Saving…" : "Save Page"}</button>
+              <div style={{ marginBottom: 8 }}><span className={`badge badge-${form.status}`}>{form.status.replace(/_/g, " ")}</span></div>
+              {(form.status === "draft" || form.status === "ready_for_review") && (
+                <>
+                  <button type="button" className="btn btn-primary" style={{ width: "100%" }} disabled={saving} onClick={() => { setForm(f => ({ ...f, status: "published" })); setTimeout(() => document.querySelector("form")?.requestSubmit(), 0); }}>
+                    {saving ? "Publishing…" : "Publish"}
+                  </button>
+                  <button type="submit" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving}>{saving ? "Saving…" : "Save Changes"}</button>
+                </>
+              )}
               {form.status === "published" && !isNew && (
-                <button type="button" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving} onClick={async () => {
-                  setSaving(true);
-                  try {
-                    const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-                    if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Re-publish failed"); }
-                    else alert("Page re-published with fresh snapshot.");
-                  } catch { alert("Re-publish failed"); }
-                  setSaving(false);
-                }}>Re-publish Snapshot</button>
+                <>
+                  <button type="button" className="btn btn-primary" style={{ width: "100%" }} disabled={saving} onClick={async () => {
+                    setSaving(true);
+                    try {
+                      const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+                      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Re-publish failed"); }
+                    } catch { alert("Re-publish failed"); }
+                    setSaving(false);
+                  }}>{saving ? "Saving…" : "Re-publish Snapshot"}</button>
+                  <button type="submit" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving}>Save Changes</button>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 4 }} disabled={saving} onClick={() => { setForm(f => ({ ...f, status: "draft" })); setTimeout(() => document.querySelector("form")?.requestSubmit(), 0); }}>Unpublish</button>
+                </>
+              )}
+              {form.status === "generating" && (
+                <>
+                  <button type="submit" className="btn btn-secondary btn-sm" style={{ width: "100%" }} disabled>Generation in progress…</button>
+                </>
+              )}
+              {form.status === "generation_failed" && (
+                <>
+                  <button type="button" className="btn btn-primary" style={{ width: "100%" }} disabled={saving} onClick={async () => {
+                    setSaving(true);
+                    setForm(f => ({ ...f, status: "generating" }));
+                    await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, status: "generating" }) });
+                    await fetch(`/api/pages/${id}/generate-variables`, { method: "POST" });
+                    const d = await (await fetch(`/api/pages/${id}`)).json();
+                    setForm(f => ({ ...f, status: d.status || "generation_failed" }));
+                    setSaving(false);
+                  }}>{saving ? "Retrying…" : "Retry Generation"}</button>
+                  <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving} onClick={() => { setForm(f => ({ ...f, status: "draft" })); setTimeout(() => document.querySelector("form")?.requestSubmit(), 0); }}>Save as Draft</button>
+                </>
+              )}
+              {isNew && (
+                <button type="submit" className="btn btn-primary" style={{ width: "100%" }} disabled={saving}>{saving ? "Creating…" : "Create Page"}</button>
               )}
               {form.slug && (
-                <a href={`/preview/${form.slug}`} target="_blank" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8, textAlign: "center" }}>Preview ↗</a>
+                <a href={`/preview/${form.slug}`} target="_blank" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 8, textAlign: "center" }}>Preview ↗</a>
               )}
             </div>
             <div className="card">
               <div className="form-field"><label>Slug</label><input value={form.slug} onChange={set("slug")} required className="form-input" />
                 {form.slug && <div style={{ marginTop: 4, fontSize: 12, color: "var(--text-muted)" }}>{contentPath}/{form.slug}</div>}
-              </div>
-              <div className="form-field">
-                <label>Status</label>
-                <select value={form.status} onChange={set("status")} className="form-input">
-                  <option value="draft">Draft</option>
-                  <option value="generating">Generating</option>
-                  <option value="ready_for_review">Ready for Review</option>
-                  <option value="generation_failed">Generation Failed</option>
-                  <option value="published">Published</option>
-                </select>
               </div>
               <div className="form-field">
                 <label>Category</label>
