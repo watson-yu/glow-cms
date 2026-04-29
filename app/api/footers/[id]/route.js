@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validId, validString, err } from "@/lib/validate";
+import { clearAllSnapshots } from "@/lib/pages";
 
 export async function GET(req, { params }) {
   const authError = await requireAuth();
@@ -27,6 +28,7 @@ export async function PUT(req, { params }) {
     const { name, content } = await req.json();
     if (!validString(name, 200)) return err("name is required (max 200 chars)");
     await pool.query("UPDATE footers SET name=?, content=? WHERE id=?", [name, content, id]);
+    clearAllSnapshots().catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);

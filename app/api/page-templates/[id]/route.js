@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { validString, err } from "@/lib/validate";
+import { clearAllSnapshots } from "@/lib/pages";
 
 export async function GET(req, { params }) {
   const authError = await requireAuth();
@@ -43,6 +44,7 @@ export async function PUT(req, { params }) {
     } catch {
       // table may not exist yet (migration pending)
     }
+    clearAllSnapshots().catch(() => {});
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error(e);
