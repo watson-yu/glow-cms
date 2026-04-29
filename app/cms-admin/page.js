@@ -88,7 +88,7 @@ export default function Home() {
                   <Link href={`/cms-admin/pages/${p.id}/edit`} className="btn btn-ghost btn-sm">Edit</Link>
                   <a href={`/preview/${p.slug}`} target="_blank" className="btn btn-ghost btn-sm">Preview</a>
                   {p.status === "published" && <button onClick={() => unpublish(p.id)} className="btn btn-ghost btn-sm">Unpublish</button>}
-                  <button onClick={() => setDeleteTarget(p)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} disabled={p.status === "published"} title={p.status === "published" ? "Unpublish before deleting" : ""}>Delete</button>
+                  {p.status !== "published" && <button onClick={() => setDeleteTarget(p)} className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }}>Delete</button>}
                 </td>
               </tr>
             ))}
