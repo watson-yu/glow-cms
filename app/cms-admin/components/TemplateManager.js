@@ -54,7 +54,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }
 
   async function saveName() {
-    if (selectedId === "new" || !selectedId || saving) return;
+    if (selectedId === "new") return save();
+    if (!selectedId || saving) return;
     if (!form.name.trim()) { setError("Name is required"); return; }
     setSaving(true); setError(null);
     const res = await fetch(`${apiPath}/${selectedId}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
