@@ -73,6 +73,7 @@ export async function PUT(req, { params }) {
     try {
       const cp = await getContentPath();
       revalidatePath(`${cp}/${slug}`);
+      revalidatePath("/", "layout");
     } catch { /* revalidation is best-effort */ }
     return NextResponse.json({ ok: true });
   } catch (e) {
