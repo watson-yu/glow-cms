@@ -112,7 +112,7 @@ export async function POST(req, { params }) {
 
       const prompt = `IMPORTANT: This is a variable generation task, NOT an HTML generation task. Ignore any instructions about generating HTML. Return ONLY a raw JSON object with string values, no HTML, no markdown fences, no explanation.\n\nGenerate short text values for these variables:\n${toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n")}`;
       try {
-        const result = await callLLM({ provider: "gemini", prompt, objectType: "variable_generation", objectKey: `section_type:${id}` });
+        const result = await callLLM({ prompt, objectType: "variable_generation", objectKey: `section_type:${id}` });
         const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
         const values = JSON.parse(clean);
         for (const [k, val] of Object.entries(values)) {
