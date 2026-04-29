@@ -30,7 +30,7 @@ export async function POST(req) {
     const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
     if (!validString(title, 500)) return err("title is required (max 500 chars)");
     if (!validSlug(slug)) return err("slug must be lowercase alphanumeric with hyphens");
-    if (status && !validStatus(status)) return err("status must be draft or published");
+    if (status && !validStatus(status)) return err("invalid status");
 
     // Blueprint expansion: inherit header/footer and sections from template
     let effectiveHeaderId = header_id ? Number(header_id) : null;
