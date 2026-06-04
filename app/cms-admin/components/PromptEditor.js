@@ -1,11 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
 
-export default function PromptEditor({ scopeType, scopeKey, label }) {
+export default function PromptEditor({ scopeType, scopeKey, label, onContentChange }) {
   const [active, setActive] = useState(null);
   const [versions, setVersions] = useState([]);
   const [draft, setDraft] = useState("");
   const [saved, setSaved] = useState(false);
+
+  // Report the current draft up so parents can react to whether a prompt exists.
+  useEffect(() => { onContentChange?.(scopeKey, draft); }, [draft, scopeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const controller = new AbortController();

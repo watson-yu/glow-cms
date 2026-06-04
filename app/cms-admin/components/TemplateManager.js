@@ -4,7 +4,7 @@ import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 import SafeHtml from "@/app/components/SafeHtml";
 
-export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor, listParams = "" }) {
+export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor, listParams = "", chatLayout = false }) {
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [form, setForm] = useState({ name: "", [contentField]: "", variables: [] });
@@ -19,6 +19,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const [loading, setLoading] = useState(true);
   const [propagateDialog, setPropagateDialog] = useState(null); // { count, pages }
   const [propagating, setPropagating] = useState(false);
+  const [scopedPrompts, setScopedPrompts] = useState({}); // scopeKey -> current prompt draft
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(setConfig);
@@ -131,8 +132,17 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     reader.readAsDataURL(file);
   }
 
+  // True when a scoped prompt (type-level or this item's) has content, so Generate can
+  // run on an empty chat box using those saved prompts alone.
+  const hasScopedPrompt = (() => {
+    const itemKey = selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null;
+    const typeC = scopedPrompts[objectType];
+    const itemC = itemKey ? scopedPrompts[itemKey] : null;
+    return !!((typeC && typeC.trim()) || (itemC && itemC.trim()));
+  })();
+
   async function generate() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() && !hasScopedPrompt) return;
     setGenerating(true);
     try {
       const res = await fetch("/api/generate", {
@@ -160,7 +170,86 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const objectKey = selectedId && selectedId !== "new" ? `${objectType}:${selectedId}` : null;
   const previewHtml = substituteVars(form[contentField], config, { stripUnresolved: !showVariables });
 
+  function chatBox() {
+    return (
+      <div className="card">
+        {/* Large template source textarea with Save on the top-right */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <div className="card-title" style={{ margin: 0 }}>Template Source</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {error && <span style={{ color: "var(--danger)", fontSize: 13 }}>{error}</span>}
+            {saved && <span className="toast-saved">✓ Saved</span>}
+            <button type="button" onClick={save} className="btn btn-primary btn-sm" disabled={saving}>{saving ? "Saving…" : "Save"}</button>
+          </div>
+        </div>
+        <textarea value={form[contentField]} onChange={e => setForm({ ...form, [contentField]: e.target.value })} rows={16} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} />
+
+        {/* Chat-style AI generation: model radios above, prompt + Generate below */}
+        <div style={{ marginTop: 16, borderTop: "1px solid var(--border)", paddingTop: 14 }}>
+          <div className="llm-radios" style={{ marginBottom: 10 }}>
+            {[["openai", "OpenAI"], ["claude", "Anthropic"], ["gemini", "Gemini"]].map(([val, label]) => (
+              <label key={val} className="llm-radio">
+                <input type="radio" name="llm" value={val} checked={llmProvider === val} onChange={() => setLlmProvider(val)} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <textarea
+            value={prompt}
+            onChange={e => setPrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (prompt.trim() && !generating) generate(); } }}
+            rows={3}
+            className="form-input"
+            placeholder="Describe what you want to generate…  (Enter to send · Shift+Enter for new line)"
+            style={{ width: "100%", resize: "vertical" }}
+          />
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+            <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", fontSize: 12 }}>
+              📎 {imageData ? "Image attached" : "Attach image"}
+              <input type="file" accept="image/*" onChange={handleImage} hidden />
+            </label>
+            {imageData && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--danger)" }} onClick={() => setImageData(null)}>✕</button>}
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || (!prompt.trim() && !hasScopedPrompt)}>
+              {generating ? "Generating…" : "Generate"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function promptEditorCards() {
+    if (!objectType) return null;
+    return (
+      <>
+        <div className="card">
+          <PromptEditor scopeType="object_type" scopeKey={objectType} label={`${title} Type Prompt`} onContentChange={(k, c) => setScopedPrompts(p => ({ ...p, [k]: c }))} />
+          <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies to all {title.toLowerCase()} when generating.</p>
+        </div>
+        {objectKey && (
+          <div className="card">
+            <PromptEditor key={objectKey} scopeType="object" scopeKey={objectKey} label={`"${form.name || "This Item"}" Prompt`} onContentChange={(k, c) => setScopedPrompts(p => ({ ...p, [k]: c }))} />
+            <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies only to this specific item.</p>
+          </div>
+        )}
+      </>
+    );
+  }
+
   function editorAndPrompts() {
+    // Chat layout (section types): half-width merged box on the left, prompt editors on the right.
+    if (chatLayout) {
+      return (
+        <div className="template-editor-grid" style={{ alignItems: "start" }}>
+          {chatBox()}
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {promptEditorCards()}
+          </div>
+        </div>
+      );
+    }
     return (
       <>
         <div className="template-editor-grid">
@@ -196,7 +285,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
               {imageData && <button type="button" className="btn btn-ghost btn-sm" style={{ fontSize: 12, color: "var(--danger)" }} onClick={() => setImageData(null)}>✕</button>}
             </div>
             <div style={{ marginTop: 12 }}>
-              <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || !prompt.trim()}>
+              <button type="button" onClick={generate} className="btn btn-primary" disabled={generating || (!prompt.trim() && !hasScopedPrompt)}>
                 {generating ? "Generating…" : "Generate"}
               </button>
             </div>
@@ -204,16 +293,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
         </div>
         {objectType && (
           <div className="template-editor-grid" style={{ marginTop: 20 }}>
-            <div className="card">
-              <PromptEditor scopeType="object_type" scopeKey={objectType} label={`${title} Type Prompt`} />
-              <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies to all {title.toLowerCase()} when generating.</p>
-            </div>
-            {objectKey && (
-              <div className="card">
-                <PromptEditor key={objectKey} scopeType="object" scopeKey={objectKey} label={`"${form.name || "This Item"}" Prompt`} />
-                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 8 }}>Applies only to this specific item.</p>
-              </div>
-            )}
+            {promptEditorCards()}
           </div>
         )}
       </>

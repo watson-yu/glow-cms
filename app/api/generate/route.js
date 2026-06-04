@@ -9,8 +9,9 @@ export async function POST(req) {
   if (authError) return authError;
   try {
     const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
-    if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
-    if (prompt.length > 10_000 || (currentHtml && currentHtml.length > 100_000)) {
+    // A prompt is optional when scoped prompts (objectType/objectKey) carry the instructions.
+    if (!prompt && !objectType && !objectKey) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
+    if ((prompt && prompt.length > 10_000) || (currentHtml && currentHtml.length > 100_000)) {
       return NextResponse.json({ error: "Input too large" }, { status: 400 });
     }
 

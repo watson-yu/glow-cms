@@ -9,7 +9,7 @@ export default function PromptsPage() {
   const [expanded, setExpanded] = useState(null);
   const [versions, setVersions] = useState([]);
 
-  useEffect(() => { fetch("/api/prompts/all").then(r => r.json()).then(setPrompts); }, []);
+  useEffect(() => { fetch("/api/prompts/all").then(r => r.json()).then(d => setPrompts(Array.isArray(d) ? d : [])); }, []);
 
   async function toggle(scopeKey) {
     if (expanded === scopeKey) { setExpanded(null); return; }

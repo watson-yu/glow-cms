@@ -23,9 +23,10 @@ export default function CategoriesPage() {
   const [creating, setCreating] = useState(false);
   const [genStatus, setGenStatus] = useState(null); // { total, done, failed }
 
-  const load = () => fetch("/api/categories").then(r => r.json()).then(setTree);
+  const load = () => fetch("/api/categories").then(r => r.json()).then(t => setTree(Array.isArray(t) ? t : []));
   const loadPages = () => fetch("/api/pages").then(r => r.json()).then(pages => {
-    setPageMap(Object.fromEntries(pages.filter(p => p.category_id).map(p => [p.category_id, p])));
+    const list = Array.isArray(pages) ? pages : [];
+    setPageMap(Object.fromEntries(list.filter(p => p.category_id).map(p => [p.category_id, p])));
   });
   useEffect(() => {
     load();
@@ -35,7 +36,12 @@ export default function CategoriesPage() {
       fetch("/api/footers").then(r => r.json()),
       fetch("/api/page-templates?include=sections").then(r => r.json()),
       fetch("/api/section-types").then(r => r.json()),
-    ]).then(([h, f, pt, st]) => setOptions({ headers: h, footers: f, pageTemplates: pt, sectionTypes: st }));
+    ]).then(([h, f, pt, st]) => setOptions({
+      headers: Array.isArray(h) ? h : [],
+      footers: Array.isArray(f) ? f : [],
+      pageTemplates: Array.isArray(pt) ? pt : [],
+      sectionTypes: Array.isArray(st) ? st : [],
+    }));
   }, []);
 
   const [selected, setSelected] = useState(new Set());

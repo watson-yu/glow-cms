@@ -12,9 +12,9 @@ export default function PageTemplatesPage() {
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(setConfig);
-    fetch("/api/headers").then(r => r.json()).then(setHeaders);
-    fetch("/api/footers").then(r => r.json()).then(setFooters);
-    fetch("/api/section-types").then(r => r.json()).then(setSectionTypes);
+    fetch("/api/headers").then(r => r.json()).then(d => setHeaders(Array.isArray(d) ? d : []));
+    fetch("/api/footers").then(r => r.json()).then(d => setFooters(Array.isArray(d) ? d : []));
+    fetch("/api/section-types").then(r => r.json()).then(d => setSectionTypes(Array.isArray(d) ? d : []));
   }, []);
 
   function renderPreview(templateHtml, { form }) {

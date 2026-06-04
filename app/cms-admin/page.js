@@ -11,7 +11,11 @@ export default function Home() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   function loadPages() {
-    return fetch("/api/pages").then(r => r.json()).then(p => { setPages(p); return p; });
+    return fetch("/api/pages").then(r => r.json()).then(p => {
+      const list = Array.isArray(p) ? p : [];
+      setPages(list);
+      return list;
+    });
   }
 
   useEffect(() => {

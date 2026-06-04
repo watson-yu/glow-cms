@@ -5,7 +5,7 @@ import { fmtDate, useTzRefresh } from "@/lib/fmt";
 export default function UsersPage() {
   const [users, setUsers] = useState([]);
   useTzRefresh();
-  useEffect(() => { fetch("/api/users").then(r => r.json()).then(setUsers); }, []);
+  useEffect(() => { fetch("/api/users").then(r => r.json()).then(d => setUsers(Array.isArray(d) ? d : [])); }, []);
 
   return (
     <>

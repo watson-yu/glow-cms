@@ -1,11 +1,24 @@
 import mysql from "mysql2/promise";
 import { NextResponse } from "next/server";
-import { isDbConfigured, saveDbConfig } from "@/lib/db";
+import { isDbConfigured, saveDbConfig, getPool } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 
 export async function GET() {
   try {
-    return NextResponse.json({ configured: isDbConfigured() });
+    const configured = isDbConfigured();
+    // Whether Google auth is enabled — booleans only, never secret values, so this
+    // stays unauthenticated and lets the admin shell decide to show the login page.
+    let authConfigured = false;
+    if (configured) {
+      try {
+        const [rows] = await getPool().query(
+          "SELECT config_key, config_value FROM system_config WHERE config_key IN ('google_client_id','google_client_secret','nextauth_secret')"
+        );
+        const cfg = Object.fromEntries(rows.map(r => [r.config_key, r.config_value]));
+        authConfigured = !!(cfg.google_client_id && cfg.google_client_secret && cfg.nextauth_secret);
+      } catch { /* DB read failed — leave authConfigured = false */ }
+    }
+    return NextResponse.json({ configured, authConfigured });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -82,11 +82,11 @@ export default function EditPage() {
     const type = sectionTypes.find(t => t.id === Number(typeId));
     if (!type) return;
     const typVars = typeof type.variables === "string" ? JSON.parse(type.variables || "[]") : (type.variables || []);
-    const hasPrompts = typVars.some(v => (v.type || "prompt") === "prompt" && v.label);
+    const hasTokens = /\{\{\w+\}\}/.test(type.default_content || "");
     const newIdx = form.sections.length;
     const newSection = { section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {}, variable_origins: {} };
     setForm(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
-    if (hasPrompts) autoGenerate(newIdx, newSection);
+    if (hasTokens) autoGenerate(newIdx, newSection);
   }
 
   function removeSection(i) {
@@ -101,39 +101,32 @@ export default function EditPage() {
 
   async function autoGenerate(sectionIdx, sectionData) {
     const s = sectionData || form.sections[sectionIdx];
-    if (!s?.type_variables?.length) return;
-    const ctx = getPageContext();
-    const origins = s.variable_origins || {};
-    const toGenerate = s.type_variables.filter(v =>
-      (v.type || "prompt") === "prompt" && v.label && (typeof origins[v.key] === "object" ? origins[v.key]?.source : origins[v.key]) !== "manual"
-    );
-    if (!toGenerate.length) return;
+    if (!s?.section_type_id) return;
 
     setGenerating(g => ({ ...g, [sectionIdx]: true }));
-    const prompt = toGenerate.map(v => `- ${v.key}: ${substituteVars(v.label, ctx)}`).join("\n");
-    const res = await fetch("/api/generate", {
+    // Backend auto-discovers every {{token}} in the template (declared or not) and
+    // resolves {{category}} etc. from the page's category — no manual variable declarations.
+    const res = await fetch("/api/generate-section", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        provider: "gemini",
-        prompt: `Generate short text values for the following variables. Return ONLY a JSON object with the keys and generated string values, no markdown fences.\n\n${prompt}`,
-        currentHtml: "",
-        objectType: null, objectKey: null,
+        sectionTypeId: s.section_type_id,
+        categoryId: form.category_id || undefined,
+        variables: s.variables || {},
+        variable_origins: s.variable_origins || {},
       }),
     });
     const data = await res.json();
     setGenerating(g => ({ ...g, [sectionIdx]: false }));
-    if (data.error) return;
-    try {
-      const clean = data.html.replace(/```json?\n?|\n?```/g, "").trim();
-      const values = JSON.parse(clean);
-      setForm(prev => {
-        const sec = [...prev.sections];
-        const newOrigins = { ...sec[sectionIdx].variable_origins };
-        for (const k of Object.keys(values)) newOrigins[k] = { source: "ai_generated", generated_at: new Date().toISOString() };
-        sec[sectionIdx] = { ...sec[sectionIdx], variables: { ...sec[sectionIdx].variables, ...values }, variable_origins: newOrigins };
-        return { ...prev, sections: sec };
-      });
-    } catch (e) { /* ignore parse errors */ }
+    if (data.error) { alert(data.error); return; }
+    const values = data.values || {};
+    if (!Object.keys(values).length) return;
+    setForm(prev => {
+      const sec = [...prev.sections];
+      const newOrigins = { ...sec[sectionIdx].variable_origins };
+      for (const k of Object.keys(values)) newOrigins[k] = { source: "ai_generated", generated_at: new Date().toISOString() };
+      sec[sectionIdx] = { ...sec[sectionIdx], variables: { ...sec[sectionIdx].variables, ...values }, variable_origins: newOrigins };
+      return { ...prev, sections: sec };
+    });
   }
 
   async function save(e) {

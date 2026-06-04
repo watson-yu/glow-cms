@@ -121,11 +121,11 @@ export default function AdminShell({ children }) {
   useEffect(() => {
     fetch("/api/db-setup").then(r => r.json()).then(d => {
       setDbReady(d.configured);
+      // authConfigured comes from the public db-setup endpoint, so signed-out users
+      // are correctly routed to the login page instead of an empty admin shell.
+      setAuthRequired(!!d.authConfigured);
       if (d.configured) {
-        fetch("/api/site-config").then(r => r.json()).then(c => setSite(c));
-        fetch("/api/system-config").then(r => r.json()).then(c => {
-          setAuthRequired(!!(c.google_client_id && c.google_client_secret?.hasValue && c.nextauth_secret?.hasValue));
-        });
+        fetch("/api/site-config").then(r => r.json()).then(c => setSite(c && !c.error ? c : { site_title: "", logo_url: "" }));
       }
     });
   }, []);
