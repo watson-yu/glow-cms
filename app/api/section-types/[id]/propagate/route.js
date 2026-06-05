@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { substituteVars } from "@/lib/template";
 import { requireAuth } from "@/lib/auth";
 import { callLLM } from "@/lib/llm";
-import { planSectionTokens, buildGenPrompt, sourceOf } from "@/lib/section-vars";
+import { planSectionTokens, buildGenPrompt, sourceOf, parseJsonLoose } from "@/lib/section-vars";
 
 export async function POST(req, { params }) {
   const authError = await requireAuth(req);
@@ -115,8 +115,8 @@ export async function POST(req, { params }) {
       if (contentToGenerate.length) {
         try {
           const result = await callLLM({ prompt: buildGenPrompt(ctx, contentToGenerate), objectType: "variable_generation", objectKey: `section_type:${id}` });
-          const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
-          const values = JSON.parse(clean);
+          const values = parseJsonLoose(result.text);
+          if (!values) throw new Error("LLM did not return JSON");
           const wanted = new Set(contentToGenerate.map(v => v.key));
           for (const [k, val] of Object.entries(values)) {
             if (!wanted.has(k)) continue;

@@ -3,7 +3,7 @@ import pool from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { callLLM } from "@/lib/llm";
-import { planSectionTokens, buildGenPrompt } from "@/lib/section-vars";
+import { planSectionTokens, buildGenPrompt, parseJsonLoose } from "@/lib/section-vars";
 
 /**
  * Auto-fill ONE section's variables for the editor's per-section "Re-generate" button.
@@ -55,9 +55,8 @@ export async function POST(req) {
     const values = { ...contextUpdates };
     if (contentToGenerate.length) {
       const result = await callLLM({ prompt: buildGenPrompt(ctx, contentToGenerate), objectType: "variable_generation", objectKey: `section_type:${sectionTypeId}` });
-      const clean = result.text.replace(/```json?\n?|\n?```/g, "").trim();
-      let parsed;
-      try { parsed = JSON.parse(clean); } catch { return NextResponse.json({ error: "Generation returned invalid JSON" }, { status: 502 }); }
+      const parsed = parseJsonLoose(result.text);
+      if (!parsed) return NextResponse.json({ error: "Generation returned invalid JSON — try again" }, { status: 502 });
       const wanted = new Set(contentToGenerate.map(v => v.key));
       for (const k of Object.keys(parsed)) if (wanted.has(k)) values[k] = parsed[k];
     }
