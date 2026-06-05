@@ -52,13 +52,17 @@ export default function PromptEditor({ scopeType, scopeKey, label, onContentChan
   }
 
   const changed = draft !== (active?.content || "");
+  // Saving always appends after the highest existing version (server uses MAX+1),
+  // so the label must reflect that — not active.version + 1, which would mislabel
+  // (and look like an overwrite) when an older version is reactivated.
+  const nextVersion = (versions.length ? Math.max(...versions.map(v => v.version)) : 0) + 1;
 
   return (
     <div>
       {label && <div className="card-title" style={{ marginBottom: 12 }}>{label}</div>}
       <textarea value={draft} onChange={e => setDraft(e.target.value)} rows={12} className="form-input" style={{ fontFamily: "monospace", fontSize: 13 }} placeholder="Enter prompt..." />
       <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
-        <button type="button" onClick={saveNew} className="btn btn-primary btn-sm" disabled={!changed}>Save as v{(active?.version || 0) + 1}</button>
+        <button type="button" onClick={saveNew} className="btn btn-primary btn-sm" disabled={!changed}>Save as v{nextVersion}</button>
         {versions.length > 1 && (
           <select
             value={active?.version || ""}

@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { substituteVars } from "@/lib/template";
+import { useToast } from "@/app/cms-admin/components/useToast";
 
 export default function EditPage() {
   const { id } = useParams();
@@ -77,6 +78,8 @@ export default function EditPage() {
   }, [form.sections, categories]);
 
   const [generating, setGenerating] = useState({});
+  const [syncing, setSyncing] = useState(false);
+  const { showNotice, toast } = useToast();
 
   function addSection(typeId) {
     const type = sectionTypes.find(t => t.id === Number(typeId));
@@ -87,6 +90,40 @@ export default function EditPage() {
     const newSection = { section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {}, variable_origins: {} };
     setForm(prev => ({ ...prev, sections: [...prev.sections, newSection] }));
     if (hasTokens) autoGenerate(newIdx, newSection);
+  }
+
+  // Reconcile this page's sections with its page template: add any missing template
+  // sections (empty), reorder to template order, and keep page-only extras at the end.
+  // Never deletes. New sections come in empty — review, Save, then Re-generate.
+  async function syncSectionsFromTemplate() {
+    if (!form.page_template_id) { showNotice("error", "This page has no page template to sync from."); return; }
+    setSyncing(true);
+    try {
+      const tpl = await (await fetch(`/api/page-templates/${form.page_template_id}`)).json();
+      const tplTypeIds = (tpl.sections || []).map(s => s.section_type_id);
+      if (!tplTypeIds.length) { showNotice("error", "This page template has no sections defined."); return; }
+      const current = [...form.sections];
+      const used = new Array(current.length).fill(false);
+      const result = [];
+      let added = 0;
+      for (const typeId of tplTypeIds) {
+        const idx = current.findIndex((s, i) => !used[i] && Number(s.section_type_id) === Number(typeId));
+        if (idx !== -1) { used[idx] = true; result.push(current[idx]); continue; }
+        const type = sectionTypes.find(t => Number(t.id) === Number(typeId));
+        if (!type) continue; // section type no longer exists
+        const typVars = typeof type.variables === "string" ? JSON.parse(type.variables || "[]") : (type.variables || []);
+        result.push({ section_type_id: type.id, type_name: type.name, content: type.default_content || "", type_variables: typVars, variables: {}, variable_origins: {} });
+        added++;
+      }
+      const extras = current.filter((_, i) => !used[i]); // page-only sections kept at the end
+      extras.forEach(s => result.push(s));
+      setForm(prev => ({ ...prev, sections: result }));
+      showNotice("success", `Synced with template: ${added} section(s) added, reordered to template order${extras.length ? `, ${extras.length} page-only section(s) kept at the end` : ""}.\n\nReview, Save, then Re-generate the new sections.`);
+    } catch (e) {
+      showNotice("error", "Sync failed: " + (e.message || e));
+    } finally {
+      setSyncing(false);
+    }
   }
 
   function removeSection(i) {
@@ -117,7 +154,7 @@ export default function EditPage() {
     });
     const data = await res.json();
     setGenerating(g => ({ ...g, [sectionIdx]: false }));
-    if (data.error) { alert(data.error); return; }
+    if (data.error) { showNotice("error", data.error); return; }
     const values = data.values || {};
     if (!Object.keys(values).length) return;
     setForm(prev => {
@@ -135,15 +172,16 @@ export default function EditPage() {
     try {
       const url = isNew ? "/api/pages" : `/api/pages/${id}`;
       const res = await fetch(url, { method: isNew ? "POST" : "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Save failed"); setSaving(false); return; }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); showNotice("error", d.error || "Save failed"); setSaving(false); return; }
       router.push("/cms-admin");
-    } catch { alert("Save failed"); setSaving(false); }
+    } catch { showNotice("error", "Save failed"); setSaving(false); }
   }
 
   if (loading) return <p style={{ color: "var(--text-muted)" }}>Loading…</p>;
 
   return (
     <>
+      {toast}
       <Link href="/cms-admin" className="back-link">← Back to Pages</Link>
       <form onSubmit={save}>
         <div className="editor-layout">
@@ -187,11 +225,17 @@ export default function EditPage() {
                   )}
                 </div>
               ))}
-              <div className="add-section-row">
+              <div className="add-section-row" style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <select className="form-input" value="" onChange={e => { if (e.target.value) addSection(e.target.value); }}>
                   <option value="" disabled>+ Add section…</option>
                   {sectionTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
+                {!isNew && form.page_template_id && (
+                  <button type="button" className="btn btn-secondary btn-sm" style={{ whiteSpace: "nowrap" }} onClick={syncSectionsFromTemplate} disabled={syncing}
+                    title="Add sections from the page template that are missing here, and reorder to match the template. Existing sections and page-only extras are kept; nothing is deleted.">
+                    {syncing ? "Syncing…" : "⟳ Sync from template"}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -214,16 +258,16 @@ export default function EditPage() {
                     setSaving(true);
                     try {
                       const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, updateSnapshot: true }) });
-                      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Re-publish failed"); }
-                    } catch { alert("Re-publish failed"); }
+                      if (!res.ok) { const d = await res.json().catch(() => ({})); showNotice("error", d.error || "Re-publish failed"); }
+                    } catch { showNotice("error", "Re-publish failed"); }
                     setSaving(false);
                   }}>{saving ? "Publishing…" : "Save & Re-publish"}</button>
                   <button type="button" className="btn btn-secondary btn-sm" style={{ width: "100%", marginTop: 8 }} disabled={saving} onClick={async () => {
                     setSaving(true);
                     try {
                       const res = await fetch(`/api/pages/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, updateSnapshot: false }) });
-                      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(d.error || "Save failed"); }
-                    } catch { alert("Save failed"); }
+                      if (!res.ok) { const d = await res.json().catch(() => ({})); showNotice("error", d.error || "Save failed"); }
+                    } catch { showNotice("error", "Save failed"); }
                     setSaving(false);
                   }}>{saving ? "Saving…" : "Save Draft"}</button>
                   <button type="button" className="btn btn-ghost btn-sm" style={{ width: "100%", marginTop: 4 }} disabled={saving} onClick={() => { setForm(f => ({ ...f, status: "draft" })); setTimeout(() => document.querySelector("form")?.requestSubmit(), 0); }}>Unpublish</button>

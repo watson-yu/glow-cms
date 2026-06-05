@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { substituteVars } from "@/lib/template";
 import PromptEditor from "./PromptEditor";
 import SafeHtml from "@/app/components/SafeHtml";
+import { useToast } from "./useToast";
+import { useConfirm } from "./useConfirm";
 
 export default function TemplateManager({ apiPath, contentField = "content", title = "Editor", renderPreview, objectType, showVariables, renderExtra, collapseEditor, listParams = "", chatLayout = false }) {
   const [items, setItems] = useState([]);
@@ -20,6 +22,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const [propagateDialog, setPropagateDialog] = useState(null); // { count, pages }
   const [propagating, setPropagating] = useState(false);
   const [scopedPrompts, setScopedPrompts] = useState({}); // scopeKey -> current prompt draft
+  const { showNotice, toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(setConfig);
@@ -113,7 +117,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   }
 
   async function remove() {
-    if (!confirm(`Delete "${form.name}"?`)) return;
+    if (!(await confirm(`Delete "${form.name}"?`, { title: "Delete", danger: true, confirmLabel: "Delete" }))) return;
     await fetch(`${apiPath}/${selectedId}`, { method: "DELETE" });
     const data = await (await fetch(apiPath + listParams)).json();
     setItems(data);
@@ -161,9 +165,9 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       });
       const data = await res.json();
       console.log("[Generate response]", data);
-      if (data.error) { alert(data.error); }
+      if (data.error) { showNotice("error", data.error); }
       else { setForm(f => ({ ...f, [contentField]: data.html })); }
-    } catch (e) { alert("Generation failed: " + e.message); }
+    } catch (e) { showNotice("error", "Generation failed: " + e.message); }
     setGenerating(false);
   }
 
@@ -302,6 +306,8 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
 
   return (
     <>
+      {toast}
+      {confirmDialog}
       {/* Row 1: title + dropdown + Add New */}
       <div className="page-header">
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>

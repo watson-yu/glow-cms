@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState, useRef, useCallback } from "react";
+import { useToast } from "@/app/cms-admin/components/useToast";
+import { useConfirm } from "@/app/cms-admin/components/useConfirm";
 
 function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
 
@@ -22,6 +24,8 @@ export default function CategoriesPage() {
   const [pageMap, setPageMap] = useState({}); // category_id -> page
   const [creating, setCreating] = useState(false);
   const [genStatus, setGenStatus] = useState(null); // { total, done, failed }
+  const { showNotice, toast } = useToast();
+  const { confirm, confirmDialog } = useConfirm();
 
   const load = () => fetch("/api/categories").then(r => r.json()).then(t => setTree(Array.isArray(t) ? t : []));
   const loadPages = () => fetch("/api/pages").then(r => r.json()).then(pages => {
@@ -112,7 +116,7 @@ export default function CategoriesPage() {
         else errors.push(`${cat.name}: ${data.error || "Unknown error"}`);
       } catch (e) { errors.push(`${cat.name}: ${e.message}`); }
     }
-    if (errors.length) alert(`Failed to create ${errors.length} page(s):\n${errors.join("\n")}`);
+    if (errors.length) showNotice("error", `Failed to create ${errors.length} page(s):\n${errors.join("\n")}`);
     setCreating(false);
     setCreateFor(null);
     setSelected(new Set());
@@ -137,7 +141,7 @@ export default function CategoriesPage() {
   }
 
   async function clearAll() {
-    if (!confirm("Delete ALL categories? This cannot be undone.")) return;
+    if (!(await confirm("Delete ALL categories? This cannot be undone.", { title: "Delete all categories", danger: true, confirmLabel: "Delete all" }))) return;
     await fetch("/api/categories/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirm: true }) });
     load();
   }
@@ -186,7 +190,7 @@ export default function CategoriesPage() {
   }
 
   async function del(id, name) {
-    if (!confirm(`Delete "${name}"? Children will also be deleted.`)) return;
+    if (!(await confirm(`Delete "${name}"? Children will also be deleted.`, { title: "Delete category", danger: true, confirmLabel: "Delete" }))) return;
     await fetch(`/api/categories/${id}`, { method: "DELETE" });
     if (editing?.id === id) setEditing(null);
     load();
@@ -209,6 +213,8 @@ export default function CategoriesPage() {
 
   return (
     <>
+      {toast}
+      {confirmDialog}
       <div style={{ position: "sticky", top: -32, zIndex: 10, background: "var(--bg)", paddingTop: 32, paddingBottom: 8, marginBottom: 8 }}>
         <div className="page-header" style={{ marginBottom: 8 }}>
           <h1>Categories</h1>

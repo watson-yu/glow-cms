@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
+import { useConfirm } from "@/app/cms-admin/components/useConfirm";
 
 const fields = [
   { key: "site_title", label: "Site Title" },
@@ -24,6 +25,7 @@ export default function SiteConfigPage() {
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [newVar, setNewVar] = useState({ key: "", value: "" });
+  const { confirm, confirmDialog } = useConfirm();
   const fileRef = useRef();
 
   useEffect(() => { fetch("/api/site-config").then(r => r.json()).then(setConfig); }, []);
@@ -57,7 +59,7 @@ export default function SiteConfigPage() {
   }
 
   async function removeLogo() {
-    if (!confirm("Remove logo?")) return;
+    if (!(await confirm("Remove logo?", { title: "Remove logo", danger: true, confirmLabel: "Remove" }))) return;
     if (config.logo_url) {
       await fetch("/api/upload", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url: config.logo_url }) });
     }
@@ -67,6 +69,7 @@ export default function SiteConfigPage() {
 
   return (
     <>
+      {confirmDialog}
       <div className="page-header">
         <h1>Site Config</h1>
         <div>

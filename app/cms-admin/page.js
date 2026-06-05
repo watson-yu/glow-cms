@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useToast } from "@/app/cms-admin/components/useToast";
 
 export default function Home() {
   const [pages, setPages] = useState([]);
@@ -9,6 +10,7 @@ export default function Home() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const { showNotice, toast } = useToast();
 
   function loadPages() {
     return fetch("/api/pages").then(r => r.json()).then(p => {
@@ -52,7 +54,7 @@ export default function Home() {
     setDeleting(true);
     const res = await fetch(`/api/pages/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) setPages(prev => prev.filter(p => p.id !== deleteTarget.id));
-    else { const d = await res.json().catch(() => ({})); alert(d.error || "Delete failed"); }
+    else { const d = await res.json().catch(() => ({})); showNotice("error", d.error || "Delete failed"); }
     setDeleting(false);
     setDeleteTarget(null);
   }
@@ -64,6 +66,7 @@ export default function Home() {
 
   return (
     <>
+      {toast}
       <div className="page-header">
         <h1>Pages</h1>
         <Link href="/cms-admin/pages/new/edit" className="btn btn-primary">+ Add New</Link>
