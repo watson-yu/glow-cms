@@ -24,6 +24,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
   const [scopedPrompts, setScopedPrompts] = useState({}); // scopeKey -> current prompt draft
   const { showNotice, toast } = useToast();
   const { confirm, confirmDialog } = useConfirm();
+  const [previewBump, setPreviewBump] = useState(0); // remount the preview (re-applies <style>) on save/generate/select
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(setConfig);
@@ -44,6 +45,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     setForm({ name: item.name, [contentField]: item[contentField] || "", variables: vars, header_id: item.header_id || null, footer_id: item.footer_id || null, sections: item.sections || [] });
     setPrompt("");
     setSaved(false);
+    setPreviewBump(b => b + 1);
   }
 
   function handleSelect(e) {
@@ -56,6 +58,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     setForm({ name: "", [contentField]: "", variables: [], header_id: null, footer_id: null, sections: [] });
     setPrompt("");
     setSaved(false);
+    setPreviewBump(b => b + 1);
   }
 
   async function saveName() {
@@ -75,6 +78,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
     if (saving) return;
     if (!form.name.trim()) { setError("Name is required"); return; }
     setSaving(true); setError(null);
+    setPreviewBump(b => b + 1);
     const url = selectedId === "new" ? apiPath : `${apiPath}/${selectedId}`;
     const method = selectedId === "new" ? "POST" : "PUT";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
@@ -166,7 +170,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       const data = await res.json();
       console.log("[Generate response]", data);
       if (data.error) { showNotice("error", data.error); }
-      else { setForm(f => ({ ...f, [contentField]: data.html })); }
+      else { setForm(f => ({ ...f, [contentField]: data.html })); setPreviewBump(b => b + 1); }
     } catch (e) { showNotice("error", "Generation failed: " + e.message); }
     setGenerating(false);
   }
@@ -337,7 +341,7 @@ export default function TemplateManager({ apiPath, contentField = "content", tit
       {/* Preview */}
       <div className="card">
         <div className="card-title">Preview</div>
-        <div className="template-preview">
+        <div className="template-preview" key={previewBump}>
           {renderPreview
             ? renderPreview(previewHtml, { form, setForm })
             : <SafeHtml html={previewHtml || '<span style="color:var(--text-muted)">No content yet</span>'} />
