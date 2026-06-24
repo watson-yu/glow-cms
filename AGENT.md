@@ -135,6 +135,14 @@ Special routes:
 - `POST /api/generate` — LLM generation (accepts provider, prompt, currentHtml, objectType, objectKey)
 - `POST/DELETE /api/upload` — S3 file upload/delete
 
+### Upload Validation
+
+`POST /api/upload` accepts image logo uploads only. Validation lives in `lib/uploadValidation.js` (`validateImageUpload`), kept separate from the route so it is unit-testable (`lib/uploadValidation.test.js`, Vitest). Rules:
+- Allowed extensions: `png`, `jpg`/`jpeg`, `webp`. Max size 5 MB (checked via `file.size` before buffering).
+- **SVG is intentionally disallowed** — it is XML that can carry inline `<script>`/external refs, so serving attacker-supplied SVG from our bucket is a stored-XSS vector. We reject rather than ship a sanitizer.
+- The stored S3 `ContentType` is derived from the validated extension, never from the client-supplied MIME type (spoofable). The S3 key uses only the validated extension, never the raw filename.
+- Filenames with no real extension are rejected (so a missing dot can't become the whole key).
+
 ### Secret Masking
 
 `system_config` API masks secret keys on GET (shows `••••••••` + last 4 chars). The masked keys are defined in `SECRET_KEYS` array in the route handler. On PUT, empty values for secret keys are skipped (preserves existing value).
