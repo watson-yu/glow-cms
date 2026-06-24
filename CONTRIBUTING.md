@@ -35,6 +35,7 @@ npm run dev
 - Database access: raw SQL via `mysql2/promise`
 - Styling: plain CSS in `app/globals.css`
 - Admin UI: client-side React
+- Tests: [Vitest](https://vitest.dev/) — run `npm test`. Tests live next to the code as `*.test.js` (e.g. `lib/template.test.js`).
 
 ## Contribution Guidelines
 

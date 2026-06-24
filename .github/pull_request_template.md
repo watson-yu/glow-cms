@@ -8,6 +8,7 @@ Explain the problem this PR solves.
 
 ## Testing
 
+- [ ] `npm test`
 - [ ] `npm run build`
 - [ ] Manual verification completed
 
