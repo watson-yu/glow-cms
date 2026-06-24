@@ -38,6 +38,8 @@ Glow CMS is a Next.js 16 App Router application with a MySQL backend. There is n
 pages.header_id → headers.id
 pages.footer_id → footers.id
 pages.page_template_id → page_templates.id
+pages.category_id → categories.id (SET NULL on delete)
+categories.parent_id → categories.id (self-ref, CASCADE delete)
 sections.page_id → pages.id (CASCADE delete)
 sections.section_type_id → section_types.id
 ```
@@ -72,6 +74,14 @@ Page templates additionally carry a `{{content}}` placeholder where assembled se
 ### Versioning
 
 Each scope_key can have multiple versions. Only one is `is_active = 1` at a time. Saving a new prompt creates a new version and deactivates the old one. Users can reactivate any previous version.
+
+The `prompts` table has `UNIQUE(scope_key, version)` (migration `004`), and the
+`POST`/`PUT /api/prompts` handlers run their `MAX(version)+1 → deactivate → insert`
+(and `deactivate → activate`) sequences inside `withTransaction` with `FOR UPDATE` on
+the max-version lookup. Together these stop concurrent saves from minting duplicate
+versions or leaving multiple/zero `is_active` rows — important because the active
+prompt drives every LLM call. The pure version-selection logic lives in `lib/prompts.js`
+(`nextPromptVersion`), unit-tested in `lib/prompts.test.js`.
 
 ### Generation Flow (`/api/generate`)
 
@@ -164,6 +174,14 @@ Special routes:
 - `GET /api/prompts/all` — list all scope_keys with summary
 - `POST /api/generate` — LLM generation (accepts provider, prompt, currentHtml, objectType, objectKey)
 - `POST/DELETE /api/upload` — S3 file upload/delete
+- `POST /api/categories/sync` — pull categories (L1) + treatments (L2) from the
+  external DB and upsert into local `categories`. The whole sync runs in one
+  `withTransaction` (a mid-loop FK failure rolls back rather than half-syncing).
+  L2 rows are keyed locally via `categoryLocalId(parent_id, id)` in `lib/categories.js`
+  (`parent_id * 100000 + id`), which throws on sibling-range collisions or signed-INT
+  overflow instead of writing a corrupt key; unit-tested in `lib/categories.test.js`.
+  **Reconciliation policy:** categories deleted externally are left in place (never
+  auto-deleted) so they can't orphan local pages.
 
 ### Upload Validation
 
@@ -275,6 +293,30 @@ All styles in `app/globals.css`. Key classes:
 - `.var-tag` — clickable variable pill (e.g. `{{site_title}}`)
 - `.config-ref` — reference info bar
 - `.prompt-versions`, `.prompt-version` — prompt history UI
+
+## Database Migrations
+
+`db/schema.sql` is the **from-scratch snapshot** applied to a brand-new database.
+`db/migrations/*.sql` are the **incremental, ordered** changes applied to existing
+databases. These two must never drift: **every change to `schema.sql` must also ship
+as a numbered migration**, and vice-versa.
+
+- **Runner**: `npm run migrate` (`db/migrate.mjs`) applies `db/migrations/*.sql` in
+  filename order and records each in a `schema_migrations` table so each file runs
+  exactly once. `npm run migrate -- --status` lists applied/pending without applying.
+  It reads DB config via `loadConfig()` (same env vars / `.db-config.json` as the app).
+- **Numbering**: zero-padded numeric prefixes (`001-…`, `002-…`); new migrations
+  start at the next free number. They sort lexicographically == numerically.
+- **Idempotency**: migrations must be safe to run against a DB that already has the
+  objects (e.g. a fresh install bootstrapped from `schema.sql`). MySQL lacks
+  `ADD COLUMN/CONSTRAINT IF NOT EXISTS`, so guard with `information_schema` lookups +
+  `PREPARE/EXECUTE` dynamic SQL (see `003-categories-and-page-category.sql`), or use
+  natively-idempotent forms (`CREATE TABLE IF NOT EXISTS`). The runner uses
+  `multipleStatements` so a file may contain several `;`-separated statements.
+- Migrations to date: `001` blueprint schema, `002` page SEO metadata,
+  `003` categories table + `pages.category_id` + `fk_pages_category` (closed a
+  schema/migration drift — `schema.sql` had them but no migration did),
+  `004` `UNIQUE(scope_key, version)` on `prompts` (dedupes first, then adds the key).
 
 ## Database Writes & Transactions
 

@@ -104,7 +104,8 @@ CREATE TABLE IF NOT EXISTS prompts (
   content TEXT,
   is_active TINYINT(1) NOT NULL DEFAULT 1,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_scope (scope_key, is_active)
+  INDEX idx_scope (scope_key, is_active),
+  UNIQUE KEY uniq_scope_version (scope_key, version)
 );
 
 CREATE TABLE IF NOT EXISTS users (
