@@ -57,6 +57,8 @@ export function substituteVars(template, config) {
 - Client-side: `TemplateManager.js` imports `substituteVars` for live preview
 - Admin page view: fetches config client-side and substitutes before rendering
 
+Page templates additionally carry a `{{content}}` placeholder where assembled section HTML is injected. Use `injectContent(template, html)` from `lib/template.js` for this — **never** `String.prototype.replace("{{content}}", html)`. A string second argument makes JS interpret `$`-sequences in the section HTML (`$$`→`$`, `$&`→matched text), silently corrupting prices/jQuery/regex/templating, and only replaces the first placeholder. `injectContent` uses a function replacement + `replaceAll` to avoid both.
+
 ## Prompt Management System
 
 3-level hierarchy, all in one `prompts` table:
@@ -192,3 +194,10 @@ All styles in `app/globals.css`. Key classes:
 - `export const dynamic = "force-dynamic"` on server-rendered pages
 - No TypeScript — all plain JavaScript with JSX
 - Minimal dependencies — no state management library, no CSS framework
+
+## Testing
+
+- Test runner is [Vitest](https://vitest.dev/). Run with `npm test` (`vitest run`).
+- Tests live next to the code as `*.test.js` (e.g. `lib/template.test.js`).
+- `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`).
+- Favor pure, dependency-free units (e.g. `lib/template.js`); avoid tests that need a live MySQL connection.
