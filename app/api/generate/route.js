@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 async function getKey(key) {
@@ -55,6 +56,9 @@ async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
 }
 
 export async function POST(req) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
   if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
 
