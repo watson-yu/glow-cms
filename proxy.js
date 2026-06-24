@@ -16,9 +16,11 @@ export const config = {
 export default async function proxy(req) {
   const { pathname } = req.nextUrl;
 
-  // NextAuth endpoints (sign-in, callbacks) and the public auth-status endpoint
-  // must stay reachable so the login flow can run.
-  if (pathname.startsWith("/api/auth")) return NextResponse.next();
+  // NextAuth endpoints (sign-in, callbacks) and the public auth-config endpoint
+  // must stay reachable so the login flow can run. Match on a path BOUNDARY, not
+  // a loose prefix, so a future sibling like /api/authenticate is not silently
+  // exempted from the gate.
+  if (pathname === "/api/auth" || pathname.startsWith("/api/auth/")) return NextResponse.next();
 
   const { configured, ok } = await authorizeRequest(req);
   if (!configured || ok) return NextResponse.next();
