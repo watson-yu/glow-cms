@@ -3,12 +3,15 @@ import { useEffect, useState, useRef } from "react";
 
 const fields = [
   { key: "site_title", label: "Site Title" },
+  { key: "base_url", label: "Base URL (for SEO / sitemap, e.g. https://example.com)" },
+  { key: "site_lang", label: "Language (HTML lang, e.g. zh-TW)" },
+  { key: "site_description", label: "Default Meta Description" },
   { key: "copyright_text", label: "Copyright Text" },
   { key: "privacy_link", label: "Privacy Policy Link" },
   { key: "terms_link", label: "Terms of Service Link" },
 ];
 
-const RESERVED_KEYS = new Set(["site_title", "copyright_text", "privacy_link", "terms_link", "logo_url", "content_path"]);
+const RESERVED_KEYS = new Set(["site_title", "base_url", "site_lang", "site_description", "copyright_text", "privacy_link", "terms_link", "logo_url", "content_path"]);
 
 function SaveBtn({ onClick, label = "Save" }) {
   const [ok, setOk] = useState(false);
