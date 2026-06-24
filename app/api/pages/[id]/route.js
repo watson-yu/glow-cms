@@ -1,4 +1,4 @@
-import pool from "@/lib/db";
+import pool, { withTransaction } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function GET(req, { params }) {
@@ -25,15 +25,17 @@ export async function GET(req, { params }) {
 export async function PUT(req, { params }) {
   const { id } = await params;
   const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
-  await pool.query(
-    "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
-    [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
-  );
-  await pool.query("DELETE FROM sections WHERE page_id = ?", [id]);
-  if (sections?.length) {
-    const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
-    await pool.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
-  }
+  await withTransaction(async (conn) => {
+    await conn.query(
+      "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
+      [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
+    );
+    await conn.query("DELETE FROM sections WHERE page_id = ?", [id]);
+    if (sections?.length) {
+      const values = sections.map((s, i) => [id, s.section_type_id, s.content, JSON.stringify(s.variables || {}), i]);
+      await conn.query("INSERT INTO sections (page_id, section_type_id, content, variables, sort_order) VALUES ?", [values]);
+    }
+  });
   return NextResponse.json({ ok: true });
 }
 
