@@ -185,6 +185,21 @@ All styles in `app/globals.css`. Key classes:
 - `.config-ref` — reference info bar
 - `.prompt-versions`, `.prompt-version` — prompt history UI
 
+## Database Writes & Transactions
+
+Any API handler that issues **more than one** dependent write (delete-then-insert,
+create-then-insert, etc.) MUST run them atomically via the `withTransaction(fn)`
+helper in `lib/db.js` — never as separate `pool.query()` calls (mysql2 autocommits,
+so a mid-sequence failure leaves data half-written). `fn` receives a dedicated
+connection; the helper commits on success, rolls back on any throw, and always
+releases the connection. Examples: page section replacement, page create +
+sections, page-template section replacement.
+
+`page_template_sections` is migration-gated: it may not exist yet on older
+deployments. Before reading or writing it, guard with `tableExists(conn, "page_template_sections")`
+(or, on the read-only GET handlers, a try/catch) so saving a template / creating
+a page still works pre-migration.
+
 ## Coding Conventions
 
 - All admin pages are `"use client"` components

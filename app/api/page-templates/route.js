@@ -1,4 +1,4 @@
-import pool from "@/lib/db";
+import pool, { withTransaction, tableExists } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -18,13 +18,17 @@ export async function GET() {
 
 export async function POST(req) {
   const { name, content, header_id, footer_id, sections } = await req.json();
-  const [r] = await pool.query(
-    "INSERT INTO page_templates (name, content, header_id, footer_id) VALUES (?, ?, ?, ?)",
-    [name, content, header_id || null, footer_id || null]
-  );
-  if (sections?.length) {
-    const values = sections.map((s, i) => [r.insertId, s.section_type_id, s.sort_order ?? i]);
-    await pool.query("INSERT INTO page_template_sections (page_template_id, section_type_id, sort_order) VALUES ?", [values]);
-  }
-  return NextResponse.json({ id: r.insertId }, { status: 201 });
+  const templateId = await withTransaction(async (conn) => {
+    const [r] = await conn.query(
+      "INSERT INTO page_templates (name, content, header_id, footer_id) VALUES (?, ?, ?, ?)",
+      [name, content, header_id || null, footer_id || null]
+    );
+    // Skip section creation if the migration hasn't been applied yet.
+    if (sections?.length && await tableExists(conn, "page_template_sections")) {
+      const values = sections.map((s, i) => [r.insertId, s.section_type_id, s.sort_order ?? i]);
+      await conn.query("INSERT INTO page_template_sections (page_template_id, section_type_id, sort_order) VALUES ?", [values]);
+    }
+    return r.insertId;
+  });
+  return NextResponse.json({ id: templateId }, { status: 201 });
 }
