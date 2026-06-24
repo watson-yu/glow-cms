@@ -269,3 +269,9 @@ a page still works pre-migration.
 - Tests live next to the code as `*.test.js` (e.g. `lib/template.test.js`).
 - `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`).
 - Favor pure, dependency-free units (e.g. `lib/template.js`); avoid tests that need a live MySQL connection.
+
+## Dependencies
+
+- `next` is pinned to an exact version (no `^`), so `npm audit fix` cannot bump it — security patches require editing `package.json` manually and staying on the latest `16.x` patch.
+- `@anthropic-ai/sdk` (used by `/api/generate`) is held at `^0.88.0`. The GHSA-p7fg-763f-g4gf advisory (insecure default file permissions in the unused local-FS memory tool, moderate) is only fixed in `0.92.0+`, which is outside the non-breaking range — left as a deliberate follow-up; bumping it requires retesting the Claude generation path.
+- Remaining moderate `npm audit` advisories (`postcss`, `uuid` via `next-auth`) are pinned transitive deps of `next`/`next-auth` and can't be cleared without breaking-change upgrades.
