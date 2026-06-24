@@ -24,11 +24,11 @@ export async function GET(req, { params }) {
 
 export async function PUT(req, { params }) {
   const { id } = await params;
-  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
+  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id, meta_title, meta_description, og_image, canonical } = await req.json();
   await withTransaction(async (conn) => {
     await conn.query(
-      "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=? WHERE id=?",
-      [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, id]
+      "UPDATE pages SET title=?, slug=?, header_id=?, footer_id=?, page_template_id=?, status=?, category_id=?, meta_title=?, meta_description=?, og_image=?, canonical=? WHERE id=?",
+      [title, slug, header_id || null, footer_id || null, page_template_id || 1, status, category_id || null, meta_title || null, meta_description || null, og_image || null, canonical || null, id]
     );
     await conn.query("DELETE FROM sections WHERE page_id = ?", [id]);
     if (sections?.length) {

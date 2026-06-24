@@ -14,7 +14,7 @@ export async function GET() {
 }
 
 export async function POST(req) {
-  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id } = await req.json();
+  const { title, slug, header_id, footer_id, page_template_id, status, sections, category_id, meta_title, meta_description, og_image, canonical } = await req.json();
 
   const pageId = await withTransaction(async (conn) => {
     // Blueprint expansion: inherit header/footer and sections from template
@@ -42,8 +42,8 @@ export async function POST(req) {
     }
 
     const [result] = await conn.query(
-      "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [title, slug, effectiveHeaderId, effectiveFooterId, page_template_id || 1, status || "draft", category_id || null]
+      "INSERT INTO pages (title, slug, header_id, footer_id, page_template_id, status, category_id, meta_title, meta_description, og_image, canonical) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [title, slug, effectiveHeaderId, effectiveFooterId, page_template_id || 1, status || "draft", category_id || null, meta_title || null, meta_description || null, og_image || null, canonical || null]
     );
     const newPageId = result.insertId;
 

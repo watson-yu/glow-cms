@@ -7,7 +7,7 @@ export default function EditPage() {
   const { id } = useParams();
   const router = useRouter();
   const isNew = id === "new";
-  const [form, setForm] = useState({ title: "", slug: "", header_id: "", footer_id: "", page_template_id: "", status: "draft", category_id: "", sections: [] });
+  const [form, setForm] = useState({ title: "", slug: "", header_id: "", footer_id: "", page_template_id: "", status: "draft", category_id: "", meta_title: "", meta_description: "", og_image: "", canonical: "", sections: [] });
   const [headers, setHeaders] = useState([]);
   const [footers, setFooters] = useState([]);
   const [pageTemplates, setPageTemplates] = useState([]);
@@ -37,6 +37,7 @@ export default function EditPage() {
     });
     if (!isNew) fetch(`/api/pages/${id}`).then(r => r.json()).then(d => setForm({
       ...d, header_id: d.header_id || "", footer_id: d.footer_id || "", page_template_id: d.page_template_id || "", category_id: d.category_id || "",
+      meta_title: d.meta_title || "", meta_description: d.meta_description || "", og_image: d.og_image || "", canonical: d.canonical || "",
       sections: (d.sections || []).map(s => ({
         ...s,
         variables: typeof s.variables === "string" ? JSON.parse(s.variables || "{}") : (s.variables || {}),
@@ -96,6 +97,29 @@ export default function EditPage() {
                 ...p.children.map(c => <option key={c.id} value={c.id}>&nbsp;&nbsp;↳ {c.name}</option>)
               ])}
             </select>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-title">SEO</div>
+          <div className="form-field">
+            <label>Meta Title</label>
+            <input value={form.meta_title} onChange={set("meta_title")} className="form-input" placeholder={form.title || "Falls back to page title"} />
+          </div>
+          <div className="form-field">
+            <label>Meta Description</label>
+            <textarea value={form.meta_description} onChange={set("meta_description")} rows={3} className="form-input" placeholder="Shown in search results and social shares" />
+          </div>
+          <div className="form-field">
+            <label>OG Image URL</label>
+            <input value={form.og_image} onChange={set("og_image")} className="form-input" placeholder="https://… (falls back to site logo)" />
+          </div>
+          <div className="form-field">
+            <label>Canonical URL</label>
+            <input value={form.canonical} onChange={set("canonical")} className="form-input" placeholder="Leave empty to derive from the slug" />
+            <p style={{ fontSize: 13, color: "var(--text-muted)", marginTop: 6 }}>
+              Override the canonical URL. Accepts a full URL or a path; empty derives <code>{contentPath}/{form.slug || "slug"}</code>.
+            </p>
           </div>
         </div>
 

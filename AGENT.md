@@ -20,7 +20,7 @@ Glow CMS is a Next.js 16 App Router application with a MySQL backend. There is n
 
 | Table | Purpose |
 |---|---|
-| `pages` | Content pages with title, slug, status, header/footer/template references |
+| `pages` | Content pages with title, slug, status, header/footer/template references, and per-page SEO columns (`meta_title`, `meta_description`, `og_image`, `canonical`) |
 | `headers` | Header HTML templates (name + content) |
 | `footers` | Footer HTML templates (name + content) |
 | `page_templates` | Page layout templates with `{{content}}` placeholder |
@@ -98,6 +98,8 @@ Each scope_key can have multiple versions. Only one is `is_active = 1` at a time
 | `/cms-admin/system-config` | System settings + LLM keys + system prompt |
 | `/preview/[slug]` | Preview any page (draft or published) |
 | `/[...slug]` | Public page catch-all (respects content_path prefix) |
+| `/sitemap.xml` | `app/sitemap.js` — all PUBLISHED pages, respects content_path |
+| `/robots.txt` | `app/robots.js` — allows public pages, disallows /cms-admin, /preview, /api |
 
 ### Content Path Logic
 
@@ -107,6 +109,34 @@ The `content_path` site config value controls public page URLs:
 - Preview is always at `/preview/how-to` regardless of content_path
 
 The catch-all `[...slug]/page.js` strips the content_path prefix to find the page slug.
+`resolvePageSlug(slugSegments, contentPath)` in `lib/pages.js` is the shared helper for this
+(used by both the page renderer and `generateMetadata`).
+
+## SEO & Public Metadata
+
+Public pages are landing pages whose purpose is search ranking, so SEO output is first-class.
+
+- **Per-page metadata**: the `pages` table has nullable `meta_title`, `meta_description`,
+  `og_image`, `canonical` columns (migration `db/migrations/002-page-seo-metadata.sql`),
+  editable in the page editor's "SEO" card.
+- **`lib/seo.js`** holds the pure (no DB/React) helpers — `buildPageMetadata`,
+  `pageCanonical`, `getBaseUrl`, `normalizeBaseUrl`, `pagePath`, and `DEFAULT_LANG`.
+  Unit-tested in `lib/seo.test.js` (Vitest — run `npm test`).
+- **`generateMetadata`** in `app/[...slug]/page.js` emits `<title>`, meta description,
+  canonical, and OpenGraph tags. Fallbacks: title → `meta_title` → page title → site name;
+  description → `meta_description` → `site_description` config; og image → `og_image` →
+  `og_image` config → `logo_url`; canonical → `canonical` column → derived from slug + content path.
+  Canonical/og URLs are made absolute against the base URL when one is configured.
+- **Base URL**: `getBaseUrl` reads `site_config.base_url`, then `NEXT_PUBLIC_SITE_URL` /
+  `SITE_URL` env, then falls back to `http://localhost:3000`. Used by sitemap, robots, and canonicals.
+- **`lang`**: the public site is Traditional Chinese. `app/layout.js` is an async server
+  component that sets `<html lang>` from `getSiteLang()` (`site_config.site_lang`, default
+  `zh-TW` via `DEFAULT_LANG`). `getSiteLang` is DB-failure-resilient (returns the default).
+- **Build safety**: sitemap/robots/layout all tolerate an unconfigured DB at build time
+  (`export const dynamic = "force-dynamic"` + try/catch) so `npm run build` never requires a DB.
+
+New SEO-related `site_config` keys: `base_url`, `site_lang`, `site_description` (all editable
+on the Site Config admin page).
 
 ## API Routes
 
