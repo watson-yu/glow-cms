@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { saveDbConfig } from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 const SECRET_KEYS = ["aws_access_key", "aws_secret_key", "db_password", "google_client_secret", "nextauth_secret", "openai_api_key", "claude_api_key", "gemini_api_key", "ext_db_password"];
@@ -9,7 +10,16 @@ function mask(value) {
   return "••••••••" + value.slice(-4);
 }
 
-export async function GET() {
+// Bootstrap route: required to enter the OAuth secrets before auth can be
+// enforced, so it allows access while the instance is unconfigured. Once OAuth
+// is configured it requires a valid allow-listed session like everything else.
+export async function GET(req) {
+  const denied = await requireAuth(req, { allowBootstrap: true });
+  if (denied) return denied;
+  return getConfigResponse();
+}
+
+async function getConfigResponse() {
   const [rows] = await pool.query("SELECT * FROM system_config");
   const config = {};
   // DB fields always come from live local config, never from system_config
@@ -35,6 +45,9 @@ export async function GET() {
 const DB_KEYS = { db_host: "host", db_port: "port", db_user: "user", db_password: "password", db_name: "database" };
 
 export async function PUT(req) {
+  const denied = await requireAuth(req, { allowBootstrap: true });
+  if (denied) return denied;
+
   const data = await req.json();
 
   // Separate DB connection fields from regular config

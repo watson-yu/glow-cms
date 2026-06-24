@@ -1,29 +1,8 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { isDbConfigured } from "@/lib/db";
+import { isDbConfigured, getPool } from "@/lib/db";
+import { getConfig, isEmailAllowed, resolveAuthUrl } from "@/lib/auth";
 import { NextResponse } from "next/server";
-
-let pool;
-async function getPool() {
-  if (!pool) pool = (await import("@/lib/db")).getPool();
-  return pool;
-}
-
-async function getConfig(key) {
-  const p = await getPool();
-  const [rows] = await p.query("SELECT config_value FROM system_config WHERE config_key = ?", [key]);
-  return rows[0]?.config_value || "";
-}
-
-function isEmailAllowed(email, allowedLogins) {
-  if (!allowedLogins.trim()) return true; // empty = allow all
-  const rules = allowedLogins.split("\n").map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (!rules.length) return true;
-  const lower = email.toLowerCase();
-  return rules.some(rule =>
-    rule.startsWith("@") ? lower.endsWith(rule) : lower === rule
-  );
-}
 
 async function getAuthOptions() {
   const [clientId, clientSecret, secret] = await Promise.all([
@@ -43,7 +22,7 @@ async function getAuthOptions() {
       async signIn({ user }) {
         const allowed = await getConfig("allowed_logins");
         if (!isEmailAllowed(user.email || "", allowed)) return false;
-        await (await getPool()).query(
+        await getPool().query(
           `INSERT INTO users (email, name, image, last_login) VALUES (?, ?, ?, NOW())
            ON DUPLICATE KEY UPDATE name=VALUES(name), image=VALUES(image), last_login=NOW()`,
           [user.email, user.name, user.image]
@@ -65,10 +44,13 @@ async function handler(req, ctx) {
   } catch (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  // Auto-detect NEXTAUTH_URL from request
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") || "https";
-  if (host) process.env.NEXTAUTH_URL = `${proto}://${host}`;
+  // Resolve NEXTAUTH_URL from a trusted source only (deploy-time env, or an
+  // explicitly allow-listed host). Never derive it from an arbitrary Host header,
+  // and never clobber an already-set deploy-time value on a per-request basis.
+  if (!process.env.NEXTAUTH_URL) {
+    const url = resolveAuthUrl(req);
+    if (url) process.env.NEXTAUTH_URL = url;
+  }
   return NextAuth(req, ctx, authOptions);
 }
 

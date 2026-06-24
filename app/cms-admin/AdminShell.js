@@ -113,15 +113,16 @@ export default function AdminShell({ children }) {
   const [authRequired, setAuthRequired] = useState(false);
 
   useEffect(() => {
-    fetch("/api/db-setup").then(r => r.json()).then(d => {
-      setDbReady(d.configured);
-      if (d.configured) {
-        fetch("/api/site-config").then(r => r.json()).then(c => setSite(c));
-        fetch("/api/system-config").then(r => r.json()).then(c => {
-          setAuthRequired(!!(c.google_client_id && c.google_client_secret?.hasValue && c.nextauth_secret?.hasValue));
-        });
+    // Auth state is computed SERVER-side and exposed (secret-free) at
+    // /api/auth/config, which stays reachable when the app's data routes are
+    // gated. Never trust the client to decide whether auth is required.
+    fetch("/api/auth/config").then(r => r.json()).then(d => {
+      setDbReady(!!d.dbConfigured);
+      setAuthRequired(!!d.authRequired);
+      if (d.dbConfigured) {
+        fetch("/api/site-config").then(r => r.json()).then(c => setSite(c)).catch(() => {});
       }
-    });
+    }).catch(() => setDbReady(false));
   }, []);
 
   if (dbReady === null || status === "loading") return null;

@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import pool from "@/lib/db";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 async function getS3Config() {
@@ -15,6 +16,9 @@ function getClient(cfg) {
 }
 
 export async function POST(req) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const formData = await req.formData();
   const file = formData.get("file");
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
@@ -36,6 +40,9 @@ export async function POST(req) {
 }
 
 export async function DELETE(req) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const { url } = await req.json();
   if (!url) return NextResponse.json({ ok: true });
 

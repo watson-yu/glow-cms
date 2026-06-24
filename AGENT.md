@@ -9,7 +9,7 @@ Glow CMS is a Next.js 16 App Router application with a MySQL backend. There is n
 ### Key Architectural Decisions
 
 - **No ORM**: All queries are raw SQL in API route handlers and `lib/pages.js`
-- **Optional auth**: Admin routes require Google sign-in when OAuth keys are configured in `system_config`
+- **Optional auth, enforced server-side**: Admin routes require an allow-listed Google sign-in once OAuth is configured in `system_config`. Enforcement is server-side (`proxy.js` + `lib/auth.js`), never client-only — see "Auth Flow" below.
 - **No component library**: All UI is plain HTML/CSS with a custom design system in `globals.css`
 - **Template engine**: Simple `{{variable}}` regex replacement, not a full template language
 - **Config in DB**: Both site config and system config are stored in MySQL, not env vars (except DB connection)
@@ -122,6 +122,7 @@ DELETE /api/{resource}/[id]   → delete
 
 Special routes:
 - `GET/POST /api/auth/[...nextauth]` — NextAuth Google sign-in
+- `GET /api/auth/config` — public, secret-free auth status (`{ dbConfigured, authRequired }`) used by the admin shell; stays reachable when other routes are gated
 - `GET/POST /api/db-setup` — DB connection validation + local config persistence
 - `GET /api/users` — list admin users from `users`
 - `GET /api/generation-logs` — list the latest 100 AI generations
@@ -140,7 +141,59 @@ Special routes:
 
 ### Auth Flow
 
-If `google_client_id` and `google_client_secret` are set in `system_config`, the admin shell requires a NextAuth Google session. Successful sign-ins are allowlist-checked against `allowed_logins` and then upserted into `users` with `last_login = NOW()`.
+Authentication is enforced **server-side**. The client `AdminShell` still renders a
+login screen, but it is cosmetic — the real gate lives in `proxy.js` and `lib/auth.js`
+and is re-evaluated on every request. Never rely on the client for access control.
+
+**Where the gate runs**
+
+- `proxy.js` (repo root) — Next.js 16 "proxy", the **Node.js-runtime** successor to
+  `middleware.js`. It must run on Node (not Edge) because the OAuth secret and the
+  allow-list live in MySQL, which Edge cannot reach; the `proxy.js` filename
+  guarantees the Node runtime (a `middleware.js` would run on Edge and could not read
+  the DB). It matches `/api/:path*`, `/cms-admin/:path*`, and `/preview/:path*`,
+  skips `/api/auth/*`, and — when OAuth is configured — requires a valid, allow-listed
+  session: 401 for API routes, redirect to `/cms-admin` for pages/previews.
+- `requireAuth(req)` in `lib/auth.js` — defense-in-depth guard called at the top of
+  the high-risk route handlers (`system-config`, `db-setup`, `upload`, `generate`,
+  `categories/sync`). It re-derives the auth state from the DB independently of the
+  proxy.
+- `getServerSession()` — used by the `/preview/[slug]` Server Component to block
+  drafts from anonymous viewers.
+
+**"Configured" vs "open"**
+
+- OAuth counts as **configured** only when `google_client_id`, `google_client_secret`,
+  and `nextauth_secret` are all set in `system_config`. This boolean is computed
+  server-side (`isOAuthConfigured()`) and exposed, secret-free, at
+  `GET /api/auth/config` for the admin shell to render the right screen.
+- When OAuth is **not** configured the instance is inherently **open** (the
+  initial-setup state). The resource/secret routes `upload`, `generate`, and
+  `categories/sync` still **fail closed** (deny) even then. The two bootstrap routes
+  `system-config` and `db-setup` are allowed while unconfigured (`allowBootstrap`) so
+  the instance can be set up in the first place — they re-lock the moment OAuth is
+  configured.
+
+> ⚠️ **Operational requirement:** Configure Google OAuth (and at least one
+> `allowed_logins` entry) **before exposing the instance to any untrusted network.**
+> An unconfigured instance is open by design; perform first-run setup on localhost or
+> a trusted network only.
+
+**Allow-list (`isEmailAllowed`)**
+
+Sign-ins and every request are allow-list-checked against `allowed_logins` (one rule
+per line; `@domain.tld` matches a whole domain, anything else is an exact, case-
+insensitive address match). The check **fails closed**: an empty/blank `allowed_logins`
+denies everyone (it never grants admin to any Google account). So after enabling OAuth
+you must add at least one allow-list entry before anyone can sign in. Successful
+sign-ins are upserted into `users` with `last_login = NOW()`.
+
+**`NEXTAUTH_URL`**
+
+The NextAuth base URL is taken from the deploy-time `NEXTAUTH_URL` env var and is
+**never** derived from an arbitrary `Host`/`X-Forwarded-Host` header (host-header
+injection). If auto-detection is needed, set `NEXTAUTH_TRUSTED_HOSTS` (comma-separated)
+and only an allow-listed host will be accepted.
 
 ## Admin UI Components
 

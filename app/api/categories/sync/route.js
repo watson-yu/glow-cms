@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import mysql from "mysql2/promise";
+import { requireAuth } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 async function getExtConfig() {
@@ -12,7 +13,10 @@ const DEFAULT_L1 = "SELECT id, zh_tw_name AS name, slug, zh_tw_description AS de
 const DEFAULT_L2 = `SELECT ct.category_id AS parent_id, t.id, t.zh_tw_name AS name, t.slug, t.zh_tw_description AS description, ct.is_primary, t.display_order
   FROM category_treatment ct JOIN treatments t ON ct.treatment_id = t.id ORDER BY ct.category_id, t.display_order`;
 
-export async function POST() {
+export async function POST(req) {
+  const denied = await requireAuth(req);
+  if (denied) return denied;
+
   const cfg = await getExtConfig();
   if (!cfg.ext_db_host || !cfg.ext_db_name) {
     return NextResponse.json({ error: "External DB not configured" }, { status: 400 });
