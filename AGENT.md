@@ -317,7 +317,10 @@ as a numbered migration**, and vice-versa.
   `PREPARE/EXECUTE` dynamic SQL (see `003-categories-and-page-category.sql`), or use
   natively-idempotent forms (`CREATE TABLE IF NOT EXISTS`). The runner uses
   `multipleStatements` so a file may contain several `;`-separated statements.
-- Migrations to date: `001` blueprint schema, `002` page SEO metadata,
+  `db/migrate.test.js` enforces this: it fails on any unguarded `ALTER TABLE`,
+  any unguarded conditional DDL, or a bare `CREATE TABLE`, and verifies the
+  runner applies each file once and re-runs as a clean no-op.
+- Migrations to date (all idempotent): `001` blueprint schema, `002` page SEO metadata,
   `003` categories table + `pages.category_id` + `fk_pages_category` (closed a
   schema/migration drift — `schema.sql` had them but no migration did),
   `004` `UNIQUE(scope_key, version)` on `prompts` (dedupes first, then adds the key).
