@@ -1,4 +1,5 @@
-import pool from "@/lib/db";
+import pool, { withTransaction } from "@/lib/db";
+import { nextPromptVersion } from "@/lib/prompts";
 import { NextResponse } from "next/server";
 
 // GET /api/prompts?scope_key=xxx — get active + version history
@@ -18,26 +19,38 @@ export async function POST(req) {
   const { scope_type, scope_key, content } = await req.json();
   if (!scope_key || !scope_type) return NextResponse.json({ error: "scope_type and scope_key required" }, { status: 400 });
 
-  // Get next version number
-  const [maxRow] = await pool.query("SELECT COALESCE(MAX(version),0) as mv FROM prompts WHERE scope_key = ?", [scope_key]);
-  const nextVersion = maxRow[0].mv + 1;
+  // The next-version SELECT, the deactivate, and the insert must be atomic:
+  // concurrent saves would otherwise pick the same version (now blocked by the
+  // UNIQUE(scope_key, version) constraint) and leave multiple is_active rows
+  // (the active prompt drives every LLM call). FOR UPDATE serializes racing
+  // writers so the second one sees the first's new max.
+  const result = await withTransaction(async (conn) => {
+    const [maxRow] = await conn.query(
+      "SELECT COALESCE(MAX(version),0) as mv FROM prompts WHERE scope_key = ? FOR UPDATE",
+      [scope_key]
+    );
+    const nextVersion = nextPromptVersion(maxRow[0].mv);
 
-  // Deactivate old
-  await pool.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
+    await conn.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
 
-  // Insert new active version
-  const [r] = await pool.query(
-    "INSERT INTO prompts (scope_type, scope_key, version, content, is_active) VALUES (?, ?, ?, ?, 1)",
-    [scope_type, scope_key, nextVersion, content || ""]
-  );
+    const [r] = await conn.query(
+      "INSERT INTO prompts (scope_type, scope_key, version, content, is_active) VALUES (?, ?, ?, ?, 1)",
+      [scope_type, scope_key, nextVersion, content || ""]
+    );
+    return { id: r.insertId, version: nextVersion };
+  });
 
-  return NextResponse.json({ id: r.insertId, version: nextVersion }, { status: 201 });
+  return NextResponse.json(result, { status: 201 });
 }
 
 // PUT /api/prompts — activate a specific version
 export async function PUT(req) {
   const { scope_key, version } = await req.json();
-  await pool.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
-  await pool.query("UPDATE prompts SET is_active = 1 WHERE scope_key = ? AND version = ?", [scope_key, version]);
+  // Deactivate-then-activate must be atomic, else a mid-sequence failure could
+  // leave the scope_key with zero active prompts.
+  await withTransaction(async (conn) => {
+    await conn.query("UPDATE prompts SET is_active = 0 WHERE scope_key = ?", [scope_key]);
+    await conn.query("UPDATE prompts SET is_active = 1 WHERE scope_key = ? AND version = ?", [scope_key, version]);
+  });
   return NextResponse.json({ ok: true });
 }
