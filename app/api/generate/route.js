@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
+import { MAX_OUTPUT_TOKENS, cleanGeneratedHtml } from "@/lib/llm";
 import { NextResponse } from "next/server";
 
 async function getKey(key) {
@@ -12,6 +13,12 @@ async function getActivePromptRow(scopeKey) {
   return rows[0] || null;
 }
 
+// Each provider returns a normalized shape: { rawText, truncated, model }.
+// rawText is the unprocessed model output (may be null/empty on a refusal or
+// content filter); truncated is true when the provider stopped because it hit
+// the output token budget. The POST handler applies the shared empty-guard /
+// fence-strip / truncation checks so all three behave identically.
+
 async function callOpenAI(apiKey, systemPrompt, userPrompt, imageData) {
   const OpenAI = (await import("openai")).default;
   const client = new OpenAI({ apiKey });
@@ -20,12 +27,20 @@ async function callOpenAI(apiKey, systemPrompt, userPrompt, imageData) {
   if (imageData) content.push({ type: "image_url", image_url: { url: `data:${imageData.mimeType};base64,${imageData.base64}` } });
   const res = await client.chat.completions.create({
     model,
+    max_tokens: MAX_OUTPUT_TOKENS,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content },
     ],
   });
-  return { html: res.choices[0].message.content, model };
+  const choice = res.choices?.[0];
+  // content is null on a content-filter stop; finish_reason "length" means the
+  // output was cut off at max_tokens.
+  return {
+    rawText: choice?.message?.content ?? "",
+    truncated: choice?.finish_reason === "length",
+    model,
+  };
 }
 
 async function callClaude(apiKey, systemPrompt, userPrompt, imageData) {
@@ -37,22 +52,40 @@ async function callClaude(apiKey, systemPrompt, userPrompt, imageData) {
   content.push({ type: "text", text: userPrompt });
   const res = await client.messages.create({
     model,
-    max_tokens: 4096,
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: systemPrompt,
     messages: [{ role: "user", content }],
   });
-  return { html: res.content[0].text, model };
+  // The content array can lead with a non-text block (e.g. thinking); pick the
+  // first text block rather than assuming index 0. stop_reason "max_tokens"
+  // means the response was truncated at the budget.
+  const textBlock = res.content?.find((b) => b.type === "text");
+  return {
+    rawText: textBlock?.text ?? "",
+    truncated: res.stop_reason === "max_tokens",
+    model,
+  };
 }
 
 async function callGemini(apiKey, systemPrompt, userPrompt, imageData) {
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const client = new GoogleGenerativeAI(apiKey);
   const model = "gemini-2.5-flash";
-  const genModel = client.getGenerativeModel({ model });
+  const genModel = client.getGenerativeModel({ model, generationConfig: { maxOutputTokens: MAX_OUTPUT_TOKENS } });
   const parts = [{ text: `${systemPrompt}\n\n${userPrompt}` }];
   if (imageData) parts.push({ inlineData: { mimeType: imageData.mimeType, data: imageData.base64 } });
   const res = await genModel.generateContent(parts);
-  return { html: res.response.text(), model };
+  // .text() throws if the candidate was blocked or returned no text; treat that
+  // as an empty completion rather than letting it escape. finishReason
+  // "MAX_TOKENS" means the output hit the budget.
+  let rawText = "";
+  try {
+    rawText = res.response?.text() ?? "";
+  } catch {
+    rawText = "";
+  }
+  const finishReason = res.response?.candidates?.[0]?.finishReason;
+  return { rawText, truncated: finishReason === "MAX_TOKENS", model };
 }
 
 export async function POST(req) {
@@ -79,6 +112,24 @@ export async function POST(req) {
     const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
     const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
 
+    // Guard against empty/refused completions and strip any stray markdown
+    // fences. Throws if there is no usable HTML — handled below so we never
+    // persist empty HTML to generation_logs as if it were a complete page.
+    const html = cleanGeneratedHtml(result.rawText);
+
+    // If the provider truncated at the output budget, surface a clear warning
+    // instead of silently returning/storing a partial (mid-tag) page.
+    if (result.truncated) {
+      return NextResponse.json(
+        {
+          error:
+            "LLM response was truncated (hit the output token limit) — the HTML is incomplete. Try a shorter request or split it into sections.",
+          truncated: true,
+        },
+        { status: 502 }
+      );
+    }
+
     // Log generation
     await pool.query(
       `INSERT INTO generation_logs (provider, model, object_type, object_key,
@@ -92,11 +143,11 @@ export async function POST(req) {
         sysRow?.id || null, sysRow?.version || null,
         typeRow?.id || null, typeRow?.version || null,
         objRow?.id || null, objRow?.version || null,
-        prompt, currentHtml || null, result.html,
+        prompt, currentHtml || null, html,
       ]
     );
 
-    return NextResponse.json({ html: result.html });
+    return NextResponse.json({ html });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 500 });
   }

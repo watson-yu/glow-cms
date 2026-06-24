@@ -77,8 +77,12 @@ Each scope_key can have multiple versions. Only one is `is_active = 1` at a time
 
 1. Build system prompt: `system` + `{objectType}` + `{objectType}:{objectId}` (all active versions, concatenated)
 2. Build user message: current HTML template + user's ad-hoc prompt
-3. Call selected LLM provider (openai/claude/gemini)
-4. Return generated HTML
+3. Call selected LLM provider (openai/claude/gemini). Each provider function returns a normalized `{ rawText, truncated, model }` — `truncated` is derived from the provider's stop/finish reason (`finish_reason === "length"` / `stop_reason === "max_tokens"` / `finishReason === "MAX_TOKENS"`).
+4. Post-process via the shared helpers in `lib/llm.js` (kept provider-agnostic and unit-tested in `lib/llm.test.js`):
+   - `MAX_OUTPUT_TOKENS` — single output budget applied to all three providers (Claude was previously capped at 4096, which truncated full pages mid-tag).
+   - `cleanGeneratedHtml(rawText)` — empty/refusal guard (throws so empty HTML is **never** persisted to `generation_logs`) + `stripCodeFences` (removes a stray ```` ```html ```` wrapper the model may emit despite the "no fences" instruction).
+   - If `truncated`, the route returns HTTP 502 with a `truncated: true` warning instead of storing/returning the partial page.
+5. Return generated HTML
 
 ## URL Routing
 
