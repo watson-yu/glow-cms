@@ -54,6 +54,10 @@ export async function PUT(req) {
   const dbFields = {};
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) continue;
+    // Documented contract: empty/blank values for secret keys are skipped so a
+    // "Change" → Save with the box left empty preserves the stored secret
+    // (API key, AWS secret, DB password) instead of wiping it.
+    if (SECRET_KEYS.includes(key) && (value === null || String(value).trim() === "")) continue;
     if (key in DB_KEYS) {
       dbFields[key] = value;
     } else {
