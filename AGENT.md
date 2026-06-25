@@ -370,7 +370,12 @@ as a numbered migration**, and vice-versa.
   forbids `{{placeholder}}` tokens (the `WHERE NOT EXISTS`-guarded `schema.sql` seed
   can't upgrade existing DBs; the migration mirrors `POST /api/prompts` —
   deactivate active row, insert `MAX(version)+1` active — and no-ops when the
-  hardened text is already active).
+  hardened text is already active). Its "is it already hardened?" comparison
+  forces both sides to `utf8mb4_general_ci`: the `content` column inherits the DB
+  default collation (`utf8mb4_0900_ai_ci` on a stock MySQL 8.x) while the mysql2
+  driver connects as `utf8mb4_unicode_ci`, and comparing the column against the
+  `@hardened` user variable without an explicit collation throws "Illegal mix of
+  collations" on a fresh server.
 
 ## Database Writes & Transactions
 
@@ -407,10 +412,39 @@ a page still works pre-migration.
 
 ## Testing
 
+Two layers: fast pure-unit tests (Vitest) and a hermetic end-to-end suite (Playwright).
+
+### Unit tests (Vitest)
+
 - Test runner is [Vitest](https://vitest.dev/). Run with `npm test` (`vitest run`).
 - Tests live next to the code as `*.test.js` (e.g. `lib/template.test.js`).
-- `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`).
+- `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`). It also `exclude`s `e2e/**` so the Playwright `*.spec.js` files are never collected by Vitest.
 - Favor pure, dependency-free units (e.g. `lib/template.js`); avoid tests that need a live MySQL connection.
+
+### End-to-end tests (Playwright)
+
+- The E2E suite lives in `e2e/` and is run with `npm run test:e2e` ([`@playwright/test`](https://playwright.dev/)). `e2e/content-pipeline.spec.js` is the maintained successor to the old `data/bootstrap-content-*` scripts: it drives the whole pipeline — mint session → create header/footer/section-type/template → generate section HTML → publish a page → fetch the public page — and asserts the rendered page is a complete landing page with the right SEO title/meta, header, footer, body, and **zero** `{{ }}` leaks or dead CTAs.
+- **It is HTTP/API-driven (the `request` fixture), not browser-driven**, so no `playwright install` of browsers is needed. `playwright.config.js`'s `webServer` starts `next start` on a test port; you must `npm run build` first.
+- **Hermetic by construction:**
+  - **DB:** `e2e/global-setup.js` runs `db:init` (schema + migrations) against a disposable test database, truncates all content tables, and seeds config directly via MySQL. The connection is read **entirely from env vars** (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT`) so the same suite runs against a local/RDS test DB or a CI service container with no code change. **Point it only at a throwaway database — it truncates content tables.**
+  - **Auth:** OAuth is "configured" in the test DB (a throwaway `nextauth_secret` + an `@glow.test` allow-list). The suite mints the exact NextAuth JWE session cookie via `next-auth/jwt` `encode` (`e2e/helpers/session.js`) — the only way to authenticate without interactive Google sign-in. **All test secrets are throwaway values in `e2e/helpers/env.js`; never commit real credentials.**
+  - **LLM:** `/api/generate` has an offline deterministic stub gated by `GLOW_LLM_STUB=1` (set by the test `webServer`). It returns clean, fence-free, placeholder-free HTML, so the suite needs no real API keys or credits and never makes a network call.
+- **Running locally** (needs a reachable, disposable MySQL — never a production DB):
+  ```sh
+  # point DB_* at any throwaway test database (local or remote)
+  export DB_HOST=... DB_USER=... DB_PASSWORD=... DB_NAME=glow_cms_testing DB_PORT=3306
+  npm ci
+  npm run build
+  npm run db:init      # apply schema.sql + migrations to the test DB (idempotent)
+  npm run test:e2e
+  ```
+  `db:init` connects directly to `DB_NAME` and strips the `CREATE DATABASE`/`USE` preamble from `schema.sql`, so the test database may be named anything (e.g. `glow_cms_testing`). The test server listens on port 3100 by default (`E2E_PORT` to override).
+- **S3:** the pipeline test never calls `/api/upload`, so no S3 access (or mock) is needed. If a future E2E case exercises uploads, stub S3 rather than hitting a real bucket.
+- **Follow-up / not yet covered:** the in-app bulk AI content generation (admin Pages list, see above) is not yet covered end-to-end — add a `e2e/*.spec.js` case that selects pages and drives the `BulkGenerate` flow against the stubbed LLM.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every PR: `npm ci` → `npm run build` → `npm test` (unit) → `npm audit --audit-level=high` (non-blocking) → `npm run db:init` → `npm run test:e2e`. MySQL is provided as a **health-checked, ephemeral `services: mysql` container** with its own throwaway database (CI never uses any shared/real DB); the DB env vars point the app and the E2E suite at it.
 
 ## Dependencies
 

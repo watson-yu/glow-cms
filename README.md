@@ -93,6 +93,15 @@ npm run dev
 4. **Page Templates** — define page layouts (preview shows header + template + footer)
 5. **Pages** — create pages, assign header/footer/template, add sections, publish
 
+## Testing
+
+```bash
+npm test          # unit tests (Vitest) — fast, no DB required
+npm run test:e2e  # end-to-end pipeline test (Playwright) — needs a reachable MySQL
+```
+
+The E2E suite (`e2e/`) stands up a disposable database, mints a NextAuth session, and drives the full pipeline (header/footer/template → page → AI generate → publish → public page) with a stubbed offline LLM, asserting the rendered page has correct SEO/header/footer/body and no `{{ }}` leaks or dead CTAs. Run it after `npm run build`; it reads its DB connection entirely from env vars (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT`), so it can point at any disposable test database. CI (`.github/workflows/ci.yml`) runs build + unit + audit + E2E on every push/PR with an ephemeral MySQL service container. See **Testing** in `AGENT.md` for details.
+
 ## Project Structure
 
 ```
