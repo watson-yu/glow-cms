@@ -94,6 +94,35 @@ prompt drives every LLM call. The pure version-selection logic lives in `lib/pro
    - If `truncated`, the route returns HTTP 502 with a `truncated: true` warning instead of storing/returning the partial page.
 5. Return generated HTML
 
+### Bulk AI Content Generation (admin Pages list)
+
+The Pages list (`app/cms-admin/page.js`) has a **"✨ Generate Content"** batch action so an
+admin can AI-generate (and regenerate) landing-page content across many pages without an
+external script — this productizes what the bootstrap `generate-*` scripts did manually.
+
+- **Selection + filters:** per-row checkboxes plus status (draft/published) and category
+  filters; "select all" applies to the currently-filtered rows. Selected pages feed the
+  `BulkGenerate` modal (`app/cms-admin/components/BulkGenerate.js`).
+- **Client-driven (no HTTP timeout):** the browser iterates the selected pages **serially**,
+  reusing the existing single-page endpoints per page — `GET /api/pages/[id]` → `POST /api/generate`
+  → `PUT /api/pages/[id]`. Nothing tries to do all N inside one server request. Live progress
+  (X of N, current page, per-page ✓/✗) and a final summary are shown; a failed page never
+  aborts the batch — failures are collected and a **"Retry failed"** button re-runs only those.
+- **Provider:** defaults to Gemini `gemini-2.5-flash` (best quality/$), with OpenAI as the
+  fallback option. Anthropic is intentionally omitted from the picker (currently billing-blocked);
+  provider errors (unconfigured key, billing) surface as the per-page failure message rather
+  than hanging.
+- **Idempotent / regenerate-not-duplicate:** generated HTML is saved into one chosen section
+  type per page. Re-running **replaces** that section in place instead of appending a duplicate.
+  An optional "set to published" toggle confirms before overwriting already-published pages.
+- **Where the logic lives / why:** the get-it-wrong pieces are pure functions in
+  `lib/bulkGenerate.js` (DOM/DB-free, unit-tested in `lib/bulkGenerate.test.js`):
+  `mergeGeneratedSection` (replace-not-duplicate), `runBulkGeneration` (serial iteration +
+  per-page failure isolation + progress events), `buildBulkPrompt`, and `failedPages` (retry
+  input). The component only wires `fetch` calls into these.
+- **Follow-ups (deferred):** auto-generating per-page SEO meta during the batch (see issue #88),
+  and a small bounded concurrency for the generate step (kept serial in v1 for simplicity).
+
 ## URL Routing
 
 | Route | Purpose |
