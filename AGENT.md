@@ -323,7 +323,12 @@ as a numbered migration**, and vice-versa.
 - Migrations to date (all idempotent): `001` blueprint schema, `002` page SEO metadata,
   `003` categories table + `pages.category_id` + `fk_pages_category` (closed a
   schema/migration drift — `schema.sql` had them but no migration did),
-  `004` `UNIQUE(scope_key, version)` on `prompts` (dedupes first, then adds the key).
+  `004` `UNIQUE(scope_key, version)` on `prompts` (dedupes first, then adds the key),
+  `005` re-seeds the active `system`/`system` prompt with the hardened wording that
+  forbids `{{placeholder}}` tokens (the `WHERE NOT EXISTS`-guarded `schema.sql` seed
+  can't upgrade existing DBs; the migration mirrors `POST /api/prompts` —
+  deactivate active row, insert `MAX(version)+1` active — and no-ops when the
+  hardened text is already active).
 
 ## Database Writes & Transactions
 
@@ -334,6 +339,14 @@ so a mid-sequence failure leaves data half-written). `fn` receives a dedicated
 connection; the helper commits on success, rolls back on any throw, and always
 releases the connection. Examples: page section replacement, page create +
 sections, page-template section replacement.
+
+`withTransaction` also retries the whole `fn` (bounded, with small exponential
+backoff, on a fresh connection) when the server reports `ER_LOCK_DEADLOCK` /
+`ER_LOCK_WAIT_TIMEOUT` — the transaction is already rolled back at that point and
+every transactional route here builds its statements purely from its inputs, so
+re-running `fn` is safe. This keeps concurrent page publishes from 500ing under
+lock races. Non-deadlock errors are never retried. Keep `fn` bodies free of
+non-idempotent side effects outside the transaction so retries stay safe.
 
 `page_template_sections` is migration-gated: it may not exist yet on older
 deployments. Before reading or writing it, guard with `tableExists(conn, "page_template_sections")`
