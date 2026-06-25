@@ -305,6 +305,19 @@ All styles in `app/globals.css`. Key classes:
 databases. These two must never drift: **every change to `schema.sql` must also ship
 as a numbered migration**, and vice-versa.
 
+- **First-time setup**: `npm run db:init` (`db/init.mjs`) is THE way to initialize a
+  database. It applies `schema.sql` and then runs all migrations, so a fresh DB ends
+  fully up to date in **one command**. This exists because `npm run migrate` alone on
+  an empty DB fails confusingly — migration `001` is an `ALTER TABLE page_templates`
+  that assumes the table exists, which it only does after `schema.sql` has run. Use
+  `db:init` to create; use `migrate` to upgrade an already-initialized DB. `db:init`
+  is idempotent (schema uses `CREATE TABLE IF NOT EXISTS` + `WHERE NOT EXISTS`/`ON
+  DUPLICATE KEY` seeds; migrations are recorded in `schema_migrations`), so re-running
+  it is a clean no-op. It connects directly to the configured `DB_NAME` and strips the
+  leading `CREATE DATABASE`/`USE glow_cms` lines from `schema.sql` (`stripSchemaPreamble`),
+  so it works even when the DB user can't `CREATE DATABASE` or the database is named
+  something other than `glow_cms`. `db/init.test.js` covers the strip logic, schema-then-
+  migrations ordering, and double-run idempotency.
 - **Runner**: `npm run migrate` (`db/migrate.mjs`) applies `db/migrations/*.sql` in
   filename order and records each in a `schema_migrations` table so each file runs
   exactly once. `npm run migrate -- --status` lists applied/pending without applying.
