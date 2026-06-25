@@ -94,6 +94,35 @@ prompt drives every LLM call. The pure version-selection logic lives in `lib/pro
    - If `truncated`, the route returns HTTP 502 with a `truncated: true` warning instead of storing/returning the partial page.
 5. Return generated HTML
 
+### Bulk AI Content Generation (admin Pages list)
+
+The Pages list (`app/cms-admin/page.js`) has a **"✨ Generate Content"** batch action so an
+admin can AI-generate (and regenerate) landing-page content across many pages without an
+external script — this productizes what the bootstrap `generate-*` scripts did manually.
+
+- **Selection + filters:** per-row checkboxes plus status (draft/published) and category
+  filters; "select all" applies to the currently-filtered rows. Selected pages feed the
+  `BulkGenerate` modal (`app/cms-admin/components/BulkGenerate.js`).
+- **Client-driven (no HTTP timeout):** the browser iterates the selected pages **serially**,
+  reusing the existing single-page endpoints per page — `GET /api/pages/[id]` → `POST /api/generate`
+  → `PUT /api/pages/[id]`. Nothing tries to do all N inside one server request. Live progress
+  (X of N, current page, per-page ✓/✗) and a final summary are shown; a failed page never
+  aborts the batch — failures are collected and a **"Retry failed"** button re-runs only those.
+- **Provider:** defaults to Gemini `gemini-2.5-flash` (best quality/$), with OpenAI as the
+  fallback option. Anthropic is intentionally omitted from the picker (currently billing-blocked);
+  provider errors (unconfigured key, billing) surface as the per-page failure message rather
+  than hanging.
+- **Idempotent / regenerate-not-duplicate:** generated HTML is saved into one chosen section
+  type per page. Re-running **replaces** that section in place instead of appending a duplicate.
+  An optional "set to published" toggle confirms before overwriting already-published pages.
+- **Where the logic lives / why:** the get-it-wrong pieces are pure functions in
+  `lib/bulkGenerate.js` (DOM/DB-free, unit-tested in `lib/bulkGenerate.test.js`):
+  `mergeGeneratedSection` (replace-not-duplicate), `runBulkGeneration` (serial iteration +
+  per-page failure isolation + progress events), `buildBulkPrompt`, and `failedPages` (retry
+  input). The component only wires `fetch` calls into these.
+- **Follow-ups (deferred):** auto-generating per-page SEO meta during the batch (see issue #88),
+  and a small bounded concurrency for the generate step (kept serial in v1 for simplicity).
+
 ## URL Routing
 
 | Route | Purpose |
@@ -305,6 +334,19 @@ All styles in `app/globals.css`. Key classes:
 databases. These two must never drift: **every change to `schema.sql` must also ship
 as a numbered migration**, and vice-versa.
 
+- **First-time setup**: `npm run db:init` (`db/init.mjs`) is THE way to initialize a
+  database. It applies `schema.sql` and then runs all migrations, so a fresh DB ends
+  fully up to date in **one command**. This exists because `npm run migrate` alone on
+  an empty DB fails confusingly — migration `001` is an `ALTER TABLE page_templates`
+  that assumes the table exists, which it only does after `schema.sql` has run. Use
+  `db:init` to create; use `migrate` to upgrade an already-initialized DB. `db:init`
+  is idempotent (schema uses `CREATE TABLE IF NOT EXISTS` + `WHERE NOT EXISTS`/`ON
+  DUPLICATE KEY` seeds; migrations are recorded in `schema_migrations`), so re-running
+  it is a clean no-op. It connects directly to the configured `DB_NAME` and strips the
+  leading `CREATE DATABASE`/`USE glow_cms` lines from `schema.sql` (`stripSchemaPreamble`),
+  so it works even when the DB user can't `CREATE DATABASE` or the database is named
+  something other than `glow_cms`. `db/init.test.js` covers the strip logic, schema-then-
+  migrations ordering, and double-run idempotency.
 - **Runner**: `npm run migrate` (`db/migrate.mjs`) applies `db/migrations/*.sql` in
   filename order and records each in a `schema_migrations` table so each file runs
   exactly once. `npm run migrate -- --status` lists applied/pending without applying.
@@ -379,27 +421,25 @@ Two layers: fast pure-unit tests (Vitest) and a hermetic end-to-end suite (Playw
 - The E2E suite lives in `e2e/` and is run with `npm run test:e2e` ([`@playwright/test`](https://playwright.dev/)). `e2e/content-pipeline.spec.js` is the maintained successor to the old `data/bootstrap-content-*` scripts: it drives the whole pipeline — mint session → create header/footer/section-type/template → generate section HTML → publish a page → fetch the public page — and asserts the rendered page is a complete landing page with the right SEO title/meta, header, footer, body, and **zero** `{{ }}` leaks or dead CTAs.
 - **It is HTTP/API-driven (the `request` fixture), not browser-driven**, so no `playwright install` of browsers is needed. `playwright.config.js`'s `webServer` starts `next start` on a test port; you must `npm run build` first.
 - **Hermetic by construction:**
-  - **DB:** `e2e/global-setup.js` runs `db:init` (schema + migrations) against a disposable test database, truncates all content tables, and seeds config directly via MySQL.
+  - **DB:** `e2e/global-setup.js` runs `db:init` (schema + migrations) against a disposable test database, truncates all content tables, and seeds config directly via MySQL. The connection is read **entirely from env vars** (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT`) so the same suite runs against a local/RDS test DB or a CI service container with no code change. **Point it only at a throwaway database — it truncates content tables.**
   - **Auth:** OAuth is "configured" in the test DB (a throwaway `nextauth_secret` + an `@glow.test` allow-list). The suite mints the exact NextAuth JWE session cookie via `next-auth/jwt` `encode` (`e2e/helpers/session.js`) — the only way to authenticate without interactive Google sign-in. **All test secrets are throwaway values in `e2e/helpers/env.js`; never commit real credentials.**
   - **LLM:** `/api/generate` has an offline deterministic stub gated by `GLOW_LLM_STUB=1` (set by the test `webServer`). It returns clean, fence-free, placeholder-free HTML, so the suite needs no real API keys or credits and never makes a network call.
-- **Running locally** (needs a reachable MySQL):
+- **Running locally** (needs a reachable, disposable MySQL — never a production DB):
   ```sh
-  export DB_HOST=127.0.0.1 DB_USER=root DB_PASSWORD= DB_NAME=glow_cms DB_PORT=3306
+  # point DB_* at any throwaway test database (local or remote)
+  export DB_HOST=... DB_USER=... DB_PASSWORD=... DB_NAME=glow_cms_testing DB_PORT=3306
   npm ci
   npm run build
-  npm run db:init      # apply schema.sql + migrations to the test DB
+  npm run db:init      # apply schema.sql + migrations to the test DB (idempotent)
   npm run test:e2e
   ```
-  `DB_NAME` must be `glow_cms` (schema.sql hard-codes that database name). The test server listens on port 3100 by default (`E2E_PORT` to override).
-- **Follow-up / not yet covered:** the bulk-generate feature (built in parallel) is out of scope here — add an E2E case for it once it lands.
-
-### Database init (`db:init`)
-
-`npm run db:init` (`db/init.mjs`) brings up a brand-new database from scratch: it applies `db/schema.sql` (connecting without a default database, since the snapshot runs `CREATE DATABASE`/`USE` itself) and then runs `db/migrations/*.sql` via the same idempotent runner as `npm run migrate`. Use it for fresh installs and for the disposable E2E/CI database.
+  `db:init` connects directly to `DB_NAME` and strips the `CREATE DATABASE`/`USE` preamble from `schema.sql`, so the test database may be named anything (e.g. `glow_cms_testing`). The test server listens on port 3100 by default (`E2E_PORT` to override).
+- **S3:** the pipeline test never calls `/api/upload`, so no S3 access (or mock) is needed. If a future E2E case exercises uploads, stub S3 rather than hitting a real bucket.
+- **Follow-up / not yet covered:** the in-app bulk AI content generation (admin Pages list, see above) is not yet covered end-to-end — add a `e2e/*.spec.js` case that selects pages and drives the `BulkGenerate` flow against the stubbed LLM.
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `main` and every PR: `npm ci` → `npm run build` → `npm test` (unit) → `npm audit --audit-level=high` (non-blocking) → `npm run db:init` → `npm run test:e2e`. MySQL is provided as a health-checked `services: mysql` container; the DB env vars point the app and the E2E suite at it.
+`.github/workflows/ci.yml` runs on every push to `main` and every PR: `npm ci` → `npm run build` → `npm test` (unit) → `npm audit --audit-level=high` (non-blocking) → `npm run db:init` → `npm run test:e2e`. MySQL is provided as a **health-checked, ephemeral `services: mysql` container** with its own throwaway database (CI never uses any shared/real DB); the DB env vars point the app and the E2E suite at it.
 
 ## Dependencies
 

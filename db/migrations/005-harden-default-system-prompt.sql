@@ -19,10 +19,19 @@ SET @hardened := 'You are an HTML template generator for a CMS. Generate clean, 
 
 -- An upgrade is needed only when there is an active system/system prompt whose
 -- content is not already the hardened wording.
+--
+-- Both operands are forced to an explicit, universally-available collation. The
+-- `content` column inherits the database's default collation, which on a stock
+-- MySQL 8.x server is utf8mb4_0900_ai_ci, while the mysql2 driver opens its
+-- connection as utf8mb4_unicode_ci — so the `@hardened` user variable carries a
+-- different collation. Comparing the two (both IMPLICIT) throws "Illegal mix of
+-- collations". Pinning both sides to utf8mb4_general_ci makes the comparison
+-- collation-independent regardless of server/driver defaults.
 SET @needs_upgrade := (
   SELECT COUNT(*) FROM prompts
   WHERE scope_type = 'system' AND scope_key = 'system'
-    AND is_active = 1 AND content <> @hardened
+    AND is_active = 1
+    AND content COLLATE utf8mb4_general_ci <> @hardened COLLATE utf8mb4_general_ci
 );
 
 SET @next_version := (

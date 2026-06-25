@@ -54,11 +54,26 @@ DB_PORT=3306
 
 ### 3. Set up the database
 
+Initialize the database with the single front-door command:
+
 ```bash
-npm run db:init
+npm run db:init                       # uses env vars / .db-config.json
+# or, loading a dotenv file explicitly:
+node --env-file=.env.local db/init.mjs
 ```
 
-`npm run db:init` applies `db/schema.sql` (creates the `glow_cms` database and all 11 application tables, including `users` and `generation_logs`) and then runs any pending `db/migrations/*.sql`. It reads DB connection config the same way the app does (`.env.local` / env vars). Re-running it is safe (idempotent).
+`npm run db:init` applies `db/schema.sql` (the from-scratch snapshot — all 11
+application tables, including `users` and `generation_logs` required by the admin
+UI) and then runs all pending migrations, so the database ends fully up to date in
+one step. It is idempotent: re-running it on an already-initialized database is a
+clean no-op. Use this for **first-time setup**; use `npm run migrate` to **upgrade**
+an already-initialized database.
+
+It connects directly to the configured database (`DB_NAME`), so it works even when
+your DB user can't `CREATE DATABASE` — the `CREATE DATABASE`/`USE` lines at the top
+of `db/schema.sql` are stripped automatically. (The raw `mysql -u root -p <
+db/schema.sql` path still works if you'd rather have the schema create the database
+itself, but then you must also run `npm run migrate`.)
 
 ### 4. Run
 
@@ -85,7 +100,7 @@ npm test          # unit tests (Vitest) — fast, no DB required
 npm run test:e2e  # end-to-end pipeline test (Playwright) — needs a reachable MySQL
 ```
 
-The E2E suite (`e2e/`) stands up a disposable database, mints a NextAuth session, and drives the full pipeline (header/footer/template → page → AI generate → publish → public page) with a stubbed offline LLM, asserting the rendered page has correct SEO/header/footer/body and no `{{ }}` leaks or dead CTAs. Run it after `npm run build`; it needs the DB env vars (`DB_HOST` etc.) and `DB_NAME=glow_cms`. CI (`.github/workflows/ci.yml`) runs build + unit + audit + E2E on every push/PR with a MySQL service container. See **Testing** in `AGENT.md` for details.
+The E2E suite (`e2e/`) stands up a disposable database, mints a NextAuth session, and drives the full pipeline (header/footer/template → page → AI generate → publish → public page) with a stubbed offline LLM, asserting the rendered page has correct SEO/header/footer/body and no `{{ }}` leaks or dead CTAs. Run it after `npm run build`; it reads its DB connection entirely from env vars (`DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT`), so it can point at any disposable test database. CI (`.github/workflows/ci.yml`) runs build + unit + audit + E2E on every push/PR with an ephemeral MySQL service container. See **Testing** in `AGENT.md` for details.
 
 ## Project Structure
 
