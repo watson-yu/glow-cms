@@ -54,13 +54,26 @@ DB_PORT=3306
 
 ### 3. Set up the database
 
-Run the checked-in bootstrap schema:
+Initialize the database with the single front-door command:
 
 ```bash
-mysql -u root -p < db/schema.sql
+npm run db:init                       # uses env vars / .db-config.json
+# or, loading a dotenv file explicitly:
+node --env-file=.env.local db/init.mjs
 ```
 
-`db/schema.sql` creates the `glow_cms` database and all 11 application tables, including `users` and `generation_logs`, which are required by the admin UI.
+`npm run db:init` applies `db/schema.sql` (the from-scratch snapshot — all 11
+application tables, including `users` and `generation_logs` required by the admin
+UI) and then runs all pending migrations, so the database ends fully up to date in
+one step. It is idempotent: re-running it on an already-initialized database is a
+clean no-op. Use this for **first-time setup**; use `npm run migrate` to **upgrade**
+an already-initialized database.
+
+It connects directly to the configured database (`DB_NAME`), so it works even when
+your DB user can't `CREATE DATABASE` — the `CREATE DATABASE`/`USE` lines at the top
+of `db/schema.sql` are stripped automatically. (The raw `mysql -u root -p <
+db/schema.sql` path still works if you'd rather have the schema create the database
+itself, but then you must also run `npm run migrate`.)
 
 ### 4. Run
 
