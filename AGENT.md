@@ -365,10 +365,41 @@ a page still works pre-migration.
 
 ## Testing
 
+Two layers: fast pure-unit tests (Vitest) and a hermetic end-to-end suite (Playwright).
+
+### Unit tests (Vitest)
+
 - Test runner is [Vitest](https://vitest.dev/). Run with `npm test` (`vitest run`).
 - Tests live next to the code as `*.test.js` (e.g. `lib/template.test.js`).
-- `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`).
+- `vitest.config.js` mirrors the `@/*` → `./*` path alias from `jsconfig.json`, so tests import modules the same way the app does (`@/lib/...`). It also `exclude`s `e2e/**` so the Playwright `*.spec.js` files are never collected by Vitest.
 - Favor pure, dependency-free units (e.g. `lib/template.js`); avoid tests that need a live MySQL connection.
+
+### End-to-end tests (Playwright)
+
+- The E2E suite lives in `e2e/` and is run with `npm run test:e2e` ([`@playwright/test`](https://playwright.dev/)). `e2e/content-pipeline.spec.js` is the maintained successor to the old `data/bootstrap-content-*` scripts: it drives the whole pipeline — mint session → create header/footer/section-type/template → generate section HTML → publish a page → fetch the public page — and asserts the rendered page is a complete landing page with the right SEO title/meta, header, footer, body, and **zero** `{{ }}` leaks or dead CTAs.
+- **It is HTTP/API-driven (the `request` fixture), not browser-driven**, so no `playwright install` of browsers is needed. `playwright.config.js`'s `webServer` starts `next start` on a test port; you must `npm run build` first.
+- **Hermetic by construction:**
+  - **DB:** `e2e/global-setup.js` runs `db:init` (schema + migrations) against a disposable test database, truncates all content tables, and seeds config directly via MySQL.
+  - **Auth:** OAuth is "configured" in the test DB (a throwaway `nextauth_secret` + an `@glow.test` allow-list). The suite mints the exact NextAuth JWE session cookie via `next-auth/jwt` `encode` (`e2e/helpers/session.js`) — the only way to authenticate without interactive Google sign-in. **All test secrets are throwaway values in `e2e/helpers/env.js`; never commit real credentials.**
+  - **LLM:** `/api/generate` has an offline deterministic stub gated by `GLOW_LLM_STUB=1` (set by the test `webServer`). It returns clean, fence-free, placeholder-free HTML, so the suite needs no real API keys or credits and never makes a network call.
+- **Running locally** (needs a reachable MySQL):
+  ```sh
+  export DB_HOST=127.0.0.1 DB_USER=root DB_PASSWORD= DB_NAME=glow_cms DB_PORT=3306
+  npm ci
+  npm run build
+  npm run db:init      # apply schema.sql + migrations to the test DB
+  npm run test:e2e
+  ```
+  `DB_NAME` must be `glow_cms` (schema.sql hard-codes that database name). The test server listens on port 3100 by default (`E2E_PORT` to override).
+- **Follow-up / not yet covered:** the bulk-generate feature (built in parallel) is out of scope here — add an E2E case for it once it lands.
+
+### Database init (`db:init`)
+
+`npm run db:init` (`db/init.mjs`) brings up a brand-new database from scratch: it applies `db/schema.sql` (connecting without a default database, since the snapshot runs `CREATE DATABASE`/`USE` itself) and then runs `db/migrations/*.sql` via the same idempotent runner as `npm run migrate`. Use it for fresh installs and for the disposable E2E/CI database.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every PR: `npm ci` → `npm run build` → `npm test` (unit) → `npm audit --audit-level=high` (non-blocking) → `npm run db:init` → `npm run test:e2e`. MySQL is provided as a health-checked `services: mysql` container; the DB env vars point the app and the E2E suite at it.
 
 ## Dependencies
 

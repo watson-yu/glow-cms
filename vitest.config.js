@@ -9,4 +9,10 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./", import.meta.url)),
     },
   },
+  test: {
+    // The Playwright E2E suite lives in e2e/ and uses *.spec.js; it must be run
+    // with `npm run test:e2e`, never collected by Vitest (its test.beforeAll /
+    // @playwright/test fixtures are incompatible with the Vitest runner).
+    exclude: ["**/node_modules/**", "**/.next/**", "e2e/**"],
+  },
 });

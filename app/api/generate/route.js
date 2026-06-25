@@ -13,6 +13,29 @@ async function getActivePromptRow(scopeKey) {
   return rows[0] || null;
 }
 
+// Deterministic, offline stub provider — enabled ONLY when GLOW_LLM_STUB=1.
+// The E2E suite sets this so the full generate → publish → render pipeline runs
+// fast, without network, and without any real API keys or credits. It returns
+// clean, fence-free HTML that deliberately contains NO {{placeholder}} tokens
+// and NO dead CTAs (every link is a literal URL), mirroring what the hardened
+// system prompt asks a real model to produce. Never enabled in production.
+function stubGenerate(prompt) {
+  // Echo the request as a heading, with any template-token characters stripped
+  // so the output can never leak `{{ }}` into a published page.
+  const heading = String(prompt || "Section")
+    .replace(/[{}<>]/g, "")
+    .trim()
+    .slice(0, 120) || "Section";
+  const rawText = [
+    `<section class="generated-section">`,
+    `  <h2>${heading}</h2>`,
+    `  <p>This is deterministic stub content generated for end-to-end testing.</p>`,
+    `  <a class="cta" href="https://example.com/contact">Contact us</a>`,
+    `</section>`,
+  ].join("\n");
+  return { rawText, truncated: false, model: "stub" };
+}
+
 // Each provider returns a normalized shape: { rawText, truncated, model }.
 // rawText is the unprocessed model output (may be null/empty on a refusal or
 // content filter); truncated is true when the provider stopped because it hit
@@ -95,8 +118,11 @@ export async function POST(req) {
   const { provider, prompt, currentHtml, objectType, objectKey, imageData } = await req.json();
   if (!prompt) return NextResponse.json({ error: "Prompt required" }, { status: 400 });
 
+  // Offline test path: skip the API-key requirement and the real provider call.
+  const useStub = process.env.GLOW_LLM_STUB === "1";
+
   const keyMap = { openai: "openai_api_key", claude: "claude_api_key", gemini: "gemini_api_key" };
-  const apiKey = await getKey(keyMap[provider] || keyMap.gemini);
+  const apiKey = useStub ? "stub" : await getKey(keyMap[provider] || keyMap.gemini);
   if (!apiKey) return NextResponse.json({ error: `No API key configured for ${provider}` }, { status: 400 });
 
   // Fetch prompt rows for logging
@@ -110,7 +136,9 @@ export async function POST(req) {
 
   try {
     const handlers = { openai: callOpenAI, claude: callClaude, gemini: callGemini };
-    const result = await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
+    const result = useStub
+      ? stubGenerate(prompt)
+      : await (handlers[provider] || handlers.gemini)(apiKey, systemPrompt, userPrompt, imageData);
 
     // Guard against empty/refused completions and strip any stray markdown
     // fences. Throws if there is no usable HTML — handled below so we never
