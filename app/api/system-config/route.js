@@ -1,6 +1,6 @@
 import pool from "@/lib/db";
 import { saveDbConfig } from "@/lib/db";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth, parseAllowedLogins } from "@/lib/auth";
 import { NextResponse } from "next/server";
 
 const SECRET_KEYS = ["aws_access_key", "aws_secret_key", "db_password", "google_client_secret", "nextauth_secret", "openai_api_key", "claude_api_key", "gemini_api_key", "ext_db_password"];
@@ -61,7 +61,11 @@ export async function PUT(req) {
     if (key in DB_KEYS) {
       dbFields[key] = value;
     } else {
-      await pool.query("INSERT INTO system_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value=?", [key, value, value]);
+      // Canonicalize the allow-list on save: accept commas and/or newlines on
+      // input but store one entry per line, so the persisted value matches the
+      // "one per line" UI hint and isEmailAllowed parses it identically.
+      const stored = key === "allowed_logins" ? parseAllowedLogins(value).join("\n") : value;
+      await pool.query("INSERT INTO system_config (config_key, config_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE config_value=?", [key, stored, stored]);
     }
   }
 
