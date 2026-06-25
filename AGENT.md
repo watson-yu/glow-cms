@@ -370,7 +370,12 @@ as a numbered migration**, and vice-versa.
   forbids `{{placeholder}}` tokens (the `WHERE NOT EXISTS`-guarded `schema.sql` seed
   can't upgrade existing DBs; the migration mirrors `POST /api/prompts` —
   deactivate active row, insert `MAX(version)+1` active — and no-ops when the
-  hardened text is already active).
+  hardened text is already active). Its "is it already hardened?" comparison
+  forces both sides to `utf8mb4_general_ci`: the `content` column inherits the DB
+  default collation (`utf8mb4_0900_ai_ci` on a stock MySQL 8.x) while the mysql2
+  driver connects as `utf8mb4_unicode_ci`, and comparing the column against the
+  `@hardened` user variable without an explicit collation throws "Illegal mix of
+  collations" on a fresh server.
 
 ## Database Writes & Transactions
 
