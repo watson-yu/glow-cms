@@ -146,7 +146,7 @@ ON DUPLICATE KEY UPDATE
   content = VALUES(content);
 
 INSERT INTO prompts (scope_type, scope_key, version, content, is_active)
-SELECT 'system', 'system', 1, 'You are an HTML template generator for a CMS. Generate clean, semantic HTML. Use {{variable}} placeholders for dynamic values from site config. Return ONLY HTML, no markdown fences, no explanation.', 1
+SELECT 'system', 'system', 1, 'You are an HTML template generator for a CMS. Generate clean, semantic HTML. Do NOT use {{variable}} placeholders or any template tokens (for example {{booking_link}}, {{phone_number}}, {{contact_phone}}) — they are not defined for these pages and render as empty strings, producing dead links and blank elements. Write every value, including calls-to-action, links, and contact details, as plain literal text, or omit it entirely. Never emit the characters {{ or }} anywhere in the output. Return ONLY HTML, no markdown fences, no explanation.', 1
 WHERE NOT EXISTS (
   SELECT 1 FROM prompts WHERE scope_type = 'system' AND scope_key = 'system'
 );
