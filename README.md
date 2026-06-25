@@ -191,3 +191,4 @@ Supported providers: OpenAI (gpt-4o-mini), Anthropic (claude-sonnet-4-20250514),
 ## License
 
 MIT
+// probe4 Thu Jun 25 17:49:24 CST 2026
